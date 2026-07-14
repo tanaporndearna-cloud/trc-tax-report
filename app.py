@@ -107,7 +107,6 @@ def process(erp_bytes, form_data, ws, inv_map):
             try: qty = float(r[ERP_COLS['RevenueQuantity']])
             except: qty = 0.0
             if prop and price > 0:
-                lines.append({'name': clean_item(desc if desc else prop), 'qty': int(qty), 'price': price})
         if not lines: continue
         avail = date_slots.get(d_str, []); cur = dc.get(d_str, 0)
         if cur + len(lines) > len(avail):
@@ -131,16 +130,16 @@ def process(erp_bytes, form_data, ws, inv_map):
 
 # ── UI ──
 st.set_page_config(page_title='TRC \u0e20\u0e32\u0e29\u0e35\u0e02\u0e32\u0e22', layout='wide')
-st.title('\ud83d\udccb TRC Motorsport \u2014 \u0e23\u0e32\u0e22\u0e07\u0e32\u0e19\u0e20\u0e32\u0e29\u0e35\u0e02\u0e32\u0e22')
+st.title('TRC Motorsport \u2014 \u0e23\u0e32\u0e22\u0e07\u0e32\u0e19\u0e20\u0e32\u0e29\u0e35\u0e02\u0e32\u0e22')
 with st.sidebar:
-    st.header('\ud83d\udd11 Google Credentials')
+    st.header('Google Credentials')
     cf = st.file_uploader('\u0e2d\u0e31\u0e1b\u0e42\u0e2b\u0e25\u0e14 Service Account JSON', type=['json'])
     if cf: creds_str = cf.read().decode('utf-8'); st.success('\u2705 \u0e42\u0e2b\u0e25\u0e14\u0e41\u0e25\u0e49\u0e27')
     else: creds_str = None; st.info('\u0e01\u0e23\u0e38\u0e13\u0e32\u0e2d\u0e31\u0e1b\u0e42\u0e2b\u0e25\u0e14 JSON')
     st.divider()
     st.caption(f'Form: {FORM_SHEET_ID}'); st.caption(f'Tax: {TAX_REPORT_SHEET_ID}')
 if not creds_str: st.warning('\u25c4 \u0e2d\u0e31\u0e1b\u0e42\u0e2b\u0e25\u0e14 credentials \u0e01\u0e48\u0e2d\u0e19\u0e04\u0e48\u0e30'); st.stop()
-if st.button('\ud83d\udd04 \u0e42\u0e2b\u0e25\u0e14 Form Responses') or 'form_data' in st.session_state:
+if st.button('\u0e42\u0e2b\u0e25\u0e14 Form Responses') or 'form_data' in st.session_state:
     if 'form_data' not in st.session_state:
         try:
             gc = connect_gspread(creds_str)
@@ -166,5 +165,5 @@ if erp_file and 'form_data' in st.session_state and 'gc' in st.session_state:
                 try: st.session_state['ws'].update(f'C{ri}:O{ri}', [v])
                 except: pass
                 bar.progress((i+1)/len(st.session_state['ops']))
-            st.success('\ud83c\udf89 \u0e40\u0e23\u0e35\u0e22\u0e1a\u0e23\u0e49\u0e2d\u0e22\u0e04\u0e48\u0e30!'); st.balloons()
+            st.success('\u0e40\u0e23\u0e35\u0e22\u0e1a\u0e23\u0e49\u0e2d\u0e22\u0e04\u0e48\u0e30!'); st.balloons()
     else: st.warning('\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 \u0e2b\u0e23\u0e37\u0e2d\u0e17\u0e38\u0e01 slot \u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e49\u0e27')
