@@ -8,9 +8,6 @@ import json
 from datetime import date, datetime
 from google.oauth2.service_account import Credentials
 
-# ============================================================
-#  CONFIG
-# ============================================================
 FORM_SHEET_ID       = "1O8x5pN7exw44wUEYOd_VcdIJ4xkc-PE8kHJmJMPSdsg"
 TAX_REPORT_SHEET_ID = "1bApVK4OjhlkaAIRVeslPIryyjNymeEz1VVVJA99dKvk"
 
@@ -19,9 +16,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
 ]
 
-# ============================================================
-#  ERP Column mapping
-# ============================================================
 def col_idx(col):
     col = col.upper()
     r = 0
@@ -42,9 +36,6 @@ ERP_COLS = {
     "PropAvailable":        col_idx("GE"),
 }
 
-# ============================================================
-#  Helpers
-# ============================================================
 def clean_name(n):
     return re.sub(r"^#\d+\s+", "", n).strip()
 
@@ -76,7 +67,6 @@ def parse_erp_csv(file_bytes):
     for enc in ("cp874", "tis-620", "utf-8-sig", "utf-8"):
         try:
             content = file_bytes.decode(enc)
-            # ตรวจว่าได้ภาษาไทยจริง (ไม่ใช่ garbage)
             if "?" not in content[:500] and "�" not in content[:500]:
                 break
         except Exception:
@@ -87,9 +77,6 @@ def parse_erp_csv(file_bytes):
     rows = list(reader)
     return rows[1:]
 
-# ============================================================
-#  Google Sheets helpers
-# ============================================================
 @st.cache_resource(show_spinner=False)
 def connect_gspread(creds_str):
     creds_dict = json.loads(creds_str) if isinstance(creds_str, str) else creds_str
@@ -97,7 +84,6 @@ def connect_gspread(creds_str):
     return gspread.authorize(creds)
 
 def get_creds_from_secrets():
-    """คืน dict ของ credentials จาก st.secrets ถ้ามี"""
     try:
         s = st.secrets["gcp_service_account"]
         return dict(s)
@@ -119,10 +105,6 @@ def read_form_responses(gc):
     return result
 
 def read_tax_sheet(gc):
-    """คืน (worksheet, inv_map, written_docs)
-    inv_map     : {inv_no: {row_idx, has_data, date_str}}
-    written_docs: set ของ ABB doc_no ที่เขียนลง sheet แล้ว (col D)
-    """
     sh = gc.open_by_key(TAX_REPORT_SHEET_ID)
     ws = sh.get_worksheet(0)
     rows = ws.get_all_values()
@@ -135,7 +117,7 @@ def read_tax_sheet(gc):
             inv_no = row[1].strip()
             has_data = bool(len(row) > 3 and row[3].strip())
             if has_data and len(row) > 3:
-                written_docs.add(row[3].strip())   # col D = เลขที่ ABB
+                written_docs.add(row[3].strip())
             if inv_no not in inv_map:
                 inv_map[inv_no] = {
                     "row_idx":  i + 1,
@@ -144,12 +126,8 @@ def read_tax_sheet(gc):
                 }
     return ws, inv_map, written_docs
 
-# ============================================================
-#  Core processing
-# ============================================================
 def process(erp_bytes, form_data, ws, inv_map, written_docs):
     erp_rows = parse_erp_csv(erp_bytes)
-
     erp_map = {}
     for row in erp_rows:
         if len(row) <= max(ERP_COLS.values()):
@@ -157,7 +135,6 @@ def process(erp_bytes, form_data, ws, inv_map, written_docs):
         doc = row[ERP_COLS["RefDocNo"]].strip()
         if doc in form_data:
             erp_map.setdefault(doc, []).append(row)
-
     if not erp_map:
         return [], []
 
@@ -170,7 +147,6 @@ def process(erp_bytes, form_data, ws, inv_map, written_docs):
 
     doc_info = {}
     for doc_no, rows in erp_map.items():
-        # ข้ามถ้าเคยเขียนไปแล้ว
         if doc_no in written_docs:
             continue
         txn_date = parse_erp_date(rows[0][ERP_COLS["TransDate"]])
@@ -178,7 +154,6 @@ def process(erp_bytes, form_data, ws, inv_map, written_docs):
             doc_info[doc_no] = {"date": txn_date, "date_str": be_date_str(txn_date)}
 
     sorted_docs = sorted(doc_info, key=lambda d: (doc_info[d]["date"], d))
-
     date_cursor = {}
     preview_rows = []
     write_ops = []
@@ -202,25 +177,16 @@ def process(erp_bytes, form_data, ws, inv_map, written_docs):
             except Exception:
                 qty = 0.0
             if prop and price > 0:
-                lines.append({
-                    "name":  clean_item(desc if desc else prop),
-                    "qty":   int(qty),
-                    "price": price,
-                })
+                lines.append({"name": clean_item(desc if desc else prop), "qty": int(qty), "price": price})
         if not lines:
             continue
 
         avail = date_slots.get(d_str, [])
         cursor = date_cursor.get(d_str, 0)
-
-        if cursor + len(lines) > len(avail):
-            st.warning(
-                f"⚠️ {doc_no}: slot ไม่พอสำหรับวันที่ {d_str} "
-                f"(ต้องการ {len(lines)} slot, เหลือ {len(avail)-cursor})"
-            )
+        if cursor + 1 > len(avail):
+            st.warning(f"⚠️ {doc_no}: ไม่มีสล็อตว่างสำหรับวันที่ {d_str}")
             continue
 
-        # ใช้ inv_no เดียวกันทุก line ของ doc นี้
         inv_no = avail[cursor]
         base_row_idx = inv_map[inv_no]["row_idx"]
 
@@ -229,24 +195,30 @@ def process(erp_bytes, form_data, ws, inv_map, written_docs):
             sale  = round(line["qty"] * line["price"], 2)
             vat   = round(sale * 0.07, 2)
             total = round(sale + vat, 2)
-
             values = [
-                inv_no,                                               # B: เลขที่ (เหมือนกันทุก line)
-                first[ERP_COLS["UserRealSurName"]].strip(),         # C: สาขา
-                doc_no,                                               # D: เลขที่ ABB
-                clean_name(first[ERP_COLS["OrderName"]].strip()),    # E: ชื่อลูกค้า
-                first[ERP_COLS["OrderAddress"]].strip(),             # F: ที่อยู่
-                first[ERP_COLS["OrderTaxId"]].strip(),              # G: เลขผู้เสียภาษี
-                line["name"],                                         # H: รายการ
-                line["qty"],                                          # I: จำนวน
-                line["price"],                                        # J: หน่วยละ
-                sale,                                                 # K: ยอดขาย
-                vat,                                                  # L: VAT 7%
-                total,                                                # M: รวม
-                fd.get("channel", ""),                                # N: ช่องทาง
-                fd.get("email_addr", ""),                             # O: อีเมล
+                inv_no,
+                first[ERP_COLS["UserRealSurName"]].strip(),
+                doc_no,
+                clean_name(first[ERP_COLS["OrderName"]].strip()),
+                first[ERP_COLS["OrderAddress"]].strip(),
+                first[ERP_COLS["OrderTaxId"]].strip(),
+                line["name"],
+                line["qty"],
+                line["price"],
+                sale,
+                vat,
+                total,
+                fd.get("channel", ""),
+                fd.get("email_addr", ""),
             ]
-            write_ops.append((row_idx, inv_no, values))
+            write_ops.append({
+                "row_idx":   row_idx,
+                "inv_no":    inv_no,
+                "values":    values,
+                "is_insert": i > 0,
+                "date_str":  d_str,
+            })
+            note = "แทรกแถว" if i > 0 else ""
             preview_rows.append({
                 "เลขที่":     inv_no,
                 "วันที่":     d_str,
@@ -258,26 +230,20 @@ def process(erp_bytes, form_data, ws, inv_map, written_docs):
                 "ยอดขาย":     sale,
                 "VAT":        vat,
                 "รวม":        total,
+                "หมายเหตุ":   note,
             })
-
-        date_cursor[d_str] = cursor + len(lines)
+        date_cursor[d_str] = cursor + 1
 
     return preview_rows, write_ops
 
-# ============================================================
-#  Streamlit UI
-# ============================================================
+# ---- UI ----
 st.set_page_config(page_title="TRC Tax Report", layout="wide")
 st.title("TRC Motorsport — Tax Report Update")
 st.caption("Match ERP CSV + Form Responses and write to Google Sheet")
 
-# Sidebar
 with st.sidebar:
     st.header("\U0001f511 Google Credentials")
-
-    # ลองโหลดจาก st.secrets ก่อน
     secret_creds = get_creds_from_secrets()
-
     if secret_creds:
         creds_str = secret_creds
         st.success("✅ โหลด credentials จาก Secrets แล้ว")
@@ -289,27 +255,14 @@ with st.sidebar:
         else:
             creds_str = None
             st.info("กรุณาอัปโหลด Service Account JSON")
-            with st.expander("\U0001f4d6 วิธีสร้าง credentials (คลิกดู)"):
-                st.markdown("""
-**1.** ไปที่ [Google Cloud Console](https://console.cloud.google.com)
-
-**2.** เปิด APIs: Google Sheets API, Google Drive API
-
-**3.** สร้าง Service Account และดาวน์โหลด JSON key
-
-**4.** Share Sheet ให้ email ของ Service Account:
-- รายงานภาษีขาย → **Editor**
-- Form Responses → **Viewer**
-                """)
     st.divider()
     st.caption(f"Form Sheet ID:\n`{FORM_SHEET_ID}`")
     st.caption(f"Tax Report Sheet ID:\n`{TAX_REPORT_SHEET_ID}`")
 
 if not creds_str:
-    st.warning("⬅️ กรุณาอัปโหลด Service Account JSON ในแถบซ้ายก่อนค่ะ")
+    st.warning("❪️ กรุณาอัปโหลด Service Account JSON ในแถบซ้ายก่อนค่ะ")
     st.stop()
 
-# Step 1
 st.subheader("1️⃣  โหลด Form Responses จาก Google Sheet")
 col1, col2 = st.columns([1, 4])
 with col1:
@@ -326,31 +279,22 @@ if load_btn or "form_data" in st.session_state:
             except Exception as e:
                 st.error(f"❌ เชื่อมต่อไม่ได้: {e}")
                 st.stop()
-
     form_data = st.session_state.get("form_data", {})
     if form_data:
         st.success(f"✅ พบ {len(form_data)} เอกสารใน Form Responses")
         with st.expander("ดูรายการเอกสาร"):
             st.dataframe(
-                pd.DataFrame([
-                    {"เลขที่เอกสาร": k,
-                     "ช่องทาง": v["channel"],
-                     "อีเมล/ที่อยู่": v["email_addr"]}
-                    for k, v in form_data.items()
-                ]),
+                pd.DataFrame([{"เลขที่เอกสาร": k, "ช่องทาง": v["channel"], "อีเมล/ที่อยู่": v["email_addr"]} for k, v in form_data.items()]),
                 use_container_width=True, hide_index=True,
             )
     else:
         st.info("ไม่พบข้อมูลใน Form Responses ค่ะ")
 
-# Step 2
 st.subheader("2️⃣  อัปโหลดไฟล์ ERP CSV")
 erp_file = st.file_uploader("เลือกไฟล์ ERPTax.csv (TIS-620/CP874)", type=["csv"])
 
-# Step 3
 if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
     st.subheader("3️⃣  ตรวจสอบข้อมูลก่อนบันทึก")
-
     with st.spinner("กำลังประมวลผล..."):
         try:
             gc = st.session_state["gc"]
@@ -365,25 +309,35 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
             st.stop()
 
     if preview_rows:
-        st.success(f"✅ พบข้อมูลที่ match ได้ **{len(preview_rows)} แถว**")
+        insert_count = sum(1 for op in write_ops if op["is_insert"])
+        note = f" (แทรกแถวใหม่ {insert_count} แถว)" if insert_count else ""
+        st.success(f"✅ พบข้อมูลที่ match ได้ **{len(preview_rows)} แถว**{note}")
         st.dataframe(pd.DataFrame(preview_rows), use_container_width=True, hide_index=True)
 
         st.subheader("4️⃣  บันทึกลง Google Sheet")
-        st.info("ระบบจะเขียนเฉพาะแถวที่ว่างอยู่ และข้ามเลขที่เคยบันทึกไปแล้วค่ะ")
+        st.info("แถวที่มีหลายรายการจะ **แทรกแถวใหม่** เลขที่ใบกำกับภาษีเดิมจะไม่ถูกลบค่ะ")
 
         if st.button("✍️ บันทึกข้อมูลลง Google Sheet", type="primary", use_container_width=False):
             progress_bar = st.progress(0, text="กำลังบันทึก...")
             errors = []
             total = len(st.session_state["write_ops"])
-            for i, (row_idx, inv_no, values) in enumerate(st.session_state["write_ops"]):
+            row_offset = 0
+
+            for i, op in enumerate(st.session_state["write_ops"]):
+                actual_row = op["row_idx"] + row_offset
+                inv_no = op["inv_no"]
                 try:
-                    st.session_state["ws"].update(f"B{row_idx}:O{row_idx}", [values])
+                    if op["is_insert"]:
+                        row_data = [op["date_str"]] + op["values"]
+                        st.session_state["ws"].insert_rows([row_data], actual_row, inherit_from_before=True)
+                        row_offset += 1
+                    else:
+                        st.session_state["ws"].update(f"B{actual_row}:O{actual_row}", [op["values"]])
                 except Exception as e:
                     errors.append(f"แถว {inv_no}: {e}")
-                progress_bar.progress(
-                    (i + 1) / total,
-                    text=f"บันทึก {inv_no}... ({i+1}/{total})",
-                )
+                action = "แทรก" if op["is_insert"] else "บันทึก"
+                progress_bar.progress((i + 1) / total, text=f"{action} {inv_no}... ({i+1}/{total})")
+
             if errors:
                 st.error("เกิดข้อผิดพลาดบางส่วน:\n" + "\n".join(errors))
             else:
