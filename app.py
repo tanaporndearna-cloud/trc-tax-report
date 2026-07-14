@@ -73,10 +73,16 @@ def be_date_str(d):
     return f"{d.day:02d}/{d.month:02d}/{d.year + 543}"
 
 def parse_erp_csv(file_bytes):
-    try:
-        content = file_bytes.decode("tis-620")
-    except Exception:
-        content = file_bytes.decode("utf-8", errors="replace")
+    for enc in ("cp874", "tis-620", "utf-8-sig", "utf-8"):
+        try:
+            content = file_bytes.decode(enc)
+            # ตรวจว่าได้ภาษาไทยจริง (ไม่ใช่ garbage)
+            if "?" not in content[:500] and "�" not in content[:500]:
+                break
+        except Exception:
+            continue
+    else:
+        content = file_bytes.decode("cp874", errors="replace")
     reader = csv.reader(io.StringIO(content))
     rows = list(reader)
     return rows[1:]
@@ -339,7 +345,7 @@ if load_btn or "form_data" in st.session_state:
 
 # Step 2
 st.subheader("2️⃣  อัปโหลดไฟล์ ERP CSV")
-erp_file = st.file_uploader("เลือกไฟล์ ERPTax.csv (TIS-620)", type=["csv"])
+erp_file = st.file_uploader("เลือกไฟล์ ERPTax.csv (TIS-620/CP874)", type=["csv"])
 
 # Step 3
 if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
@@ -368,19 +374,20 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
         if st.button("✍️ บันทึกข้อมูลลง Google Sheet", type="primary", use_container_width=False):
             progress_bar = st.progress(0, text="กำลังบันทึก...")
             errors = []
+            total = len(st.session_state["write_ops"])
             for i, (row_idx, inv_no, values) in enumerate(st.session_state["write_ops"]):
                 try:
                     st.session_state["ws"].update(f"B{row_idx}:O{row_idx}", [values])
                 except Exception as e:
                     errors.append(f"แถว {inv_no}: {e}")
                 progress_bar.progress(
-                    (i + 1) / len(st.session_state["write_ops"]),
-                    text=f"บันทึก {inv_no}... ({i+1}/{len(st.session_state['write_ops'])})",
+                    (i + 1) / total,
+                    text=f"บันทึก {inv_no}... ({i+1}/{total})",
                 )
             if errors:
                 st.error("เกิดข้อผิดพลาดบางส่วน:\n" + "\n".join(errors))
             else:
-                st.success(f"\U0001f389 บันทึกเรียบร้อย {len(write_ops)} แถวค่ะ!")
+                st.success(f"\U0001f389 บันทึกเรียบร้อย {total} แถวค่ะ!")
                 st.balloons()
     else:
         if written_docs:
