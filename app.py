@@ -86,9 +86,17 @@ def parse_erp_csv(file_bytes):
 # ============================================================
 @st.cache_resource(show_spinner=False)
 def connect_gspread(creds_str):
-    creds_dict = json.loads(creds_str)
+    creds_dict = json.loads(creds_str) if isinstance(creds_str, str) else creds_str
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return gspread.authorize(creds)
+
+def get_creds_from_secrets():
+    """คืน dict ของ credentials จาก st.secrets ถ้ามี"""
+    try:
+        s = st.secrets["gcp_service_account"]
+        return dict(s)
+    except Exception:
+        return None
 
 def read_form_responses(gc):
     sh = gc.open_by_key(FORM_SHEET_ID)
@@ -260,15 +268,23 @@ st.caption("Match ERP CSV + Form Responses and write to Google Sheet")
 # Sidebar
 with st.sidebar:
     st.header("\U0001f511 Google Credentials")
-    creds_file = st.file_uploader("อัปโหลด Service Account JSON", type=["json"])
-    if creds_file:
-        creds_str = creds_file.read().decode("utf-8")
-        st.success("✅ โหลด credentials แล้ว")
+
+    # ลองโหลดจาก st.secrets ก่อน
+    secret_creds = get_creds_from_secrets()
+
+    if secret_creds:
+        creds_str = secret_creds
+        st.success("✅ โหลด credentials จาก Secrets แล้ว")
     else:
-        creds_str = None
-        st.info("กรุณาอัปโหลด Service Account JSON")
-        with st.expander("\U0001f4d6 วิธีสร้าง credentials (คลิกดู)"):
-            st.markdown("""
+        creds_file = st.file_uploader("อัปโหลด Service Account JSON", type=["json"])
+        if creds_file:
+            creds_str = creds_file.read().decode("utf-8")
+            st.success("✅ โหลด credentials แล้ว")
+        else:
+            creds_str = None
+            st.info("กรุณาอัปโหลด Service Account JSON")
+            with st.expander("\U0001f4d6 วิธีสร้าง credentials (คลิกดู)"):
+                st.markdown("""
 **1.** ไปที่ [Google Cloud Console](https://console.cloud.google.com)
 
 **2.** เปิด APIs: Google Sheets API, Google Drive API
@@ -278,7 +294,7 @@ with st.sidebar:
 **4.** Share Sheet ให้ email ของ Service Account:
 - รายงานภาษีขาย → **Editor**
 - Form Responses → **Viewer**
-            """)
+                """)
     st.divider()
     st.caption(f"Form Sheet ID:\n`{FORM_SHEET_ID}`")
     st.caption(f"Tax Report Sheet ID:\n`{TAX_REPORT_SHEET_ID}`")
