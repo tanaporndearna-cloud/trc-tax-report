@@ -130,7 +130,7 @@ def process(erp_bytes, form_data, ws, inv_map):
     return preview, ops
 
 # ── UI ──
-st.set_page_config(page_title='TRC \u0e20\u0e32\u0e29\u0e35\u0e02\u0e32\u0e22', page_icon='\ud83d\udccb', layout='wide')
+st.set_page_config(page_title='TRC \u0e20\u0e32\u0e29\u0e35\u0e02\u0e32\u0e22', layout='wide')
 st.title('\ud83d\udccb TRC Motorsport \u2014 \u0e23\u0e32\u0e22\u0e07\u0e32\u0e19\u0e20\u0e32\u0e29\u0e35\u0e02\u0e32\u0e22')
 with st.sidebar:
     st.header('\ud83d\udd11 Google Credentials')
