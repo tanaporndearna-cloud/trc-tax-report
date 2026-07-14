@@ -75,7 +75,8 @@ def parse_erp_csv(file_bytes):
         content = file_bytes.decode("cp874", errors="replace")
     reader = csv.reader(io.StringIO(content))
     rows = list(reader)
-    return rows[1:]
+    header = rows[0] if rows else []
+    return header, rows[1:]
 
 @st.cache_resource(show_spinner=False)
 def connect_gspread(creds_str):
@@ -127,7 +128,13 @@ def read_tax_sheet(gc):
     return ws, inv_map, written_docs
 
 def process(erp_bytes, form_data, ws, inv_map, written_docs):
-    erp_rows = parse_erp_csv(erp_bytes)
+    header, erp_rows = parse_erp_csv(erp_bytes)
+    # หา column index ของ ShipToBranchNumber จาก header
+    try:
+        branch_col = header.index("ShipToBranchNumber")
+    except ValueError:
+        branch_col = ERP_COLS["UserRealSurName"]  # fallback เดิม
+
     erp_map = {}
     for row in erp_rows:
         if len(row) <= max(ERP_COLS.values()):
@@ -197,7 +204,7 @@ def process(erp_bytes, form_data, ws, inv_map, written_docs):
             total = round(sale + vat, 2)
             values = [
                 inv_no,
-                first[ERP_COLS["UserRealSurName"]].strip(),
+                first[branch_col].strip() if branch_col < len(first) else "",
                 doc_no,
                 clean_name(first[ERP_COLS["OrderName"]].strip()),
                 first[ERP_COLS["OrderAddress"]].strip(),
