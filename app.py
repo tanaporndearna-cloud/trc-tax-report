@@ -252,7 +252,7 @@ def process(erp_bytes, form_data, ws, inv_map):
 # ============================================================
 st.set_page_config(
     page_title="TRC Tax Report",
-    ="wide",
+    layout="wide",
 )
 
 st.title("TRC Motorsport — Tax Report Update")
