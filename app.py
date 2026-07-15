@@ -552,29 +552,32 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
             if errors:
                 st.error("Some errors:\n" + "\n".join(errors))
             else:
-                # Batch-write tax IDs using explicit stringValue (Sheets API batchUpdate)
-                # This is the only way to guarantee the value is stored as TEXT, not a number
+                # Write tax IDs as RAW text using ws.batch_update (values API)
+                # RAW mode + Python string = stored as text in Sheets, no scientific notation
                 if tax_id_updates:
-                    with st.spinner("Writing tax IDs as text..."):
-                        spreadsheet = tax_id_updates[0]["ws"].spreadsheet
-                        requests = [
-                            {
-                                "updateCells": {
-                                    "range": {
-                                        "sheetId": tu["ws"].id,
-                                        "startRowIndex": tu["row"] - 1,  # 0-indexed
-                                        "endRowIndex": tu["row"],
-                                        "startColumnIndex": 6,  # column G = index 6
-                                        "endColumnIndex": 7,
-                                    },
-                                    "rows": [{"values": [{"userEnteredValue": {"stringValue": tu["tax_id"]}}]}],
-                                    "fields": "userEnteredValue",
-                                }
-                            }
-                            for tu in tax_id_updates
-                        ]
-                        sheets_call(lambda: spreadsheet.batch_update({"requests": requests}))
-                        time.sleep(1.0)
+                    with st.spinner(f"Writing {len(tax_id_updates)} tax IDs as text..."):
+                        by_ws = {}
+                        for tu in tax_id_updates:
+                            k = id(tu["ws"])
+                            if k not in by_ws:
+                                by_ws[k] = {"ws": tu["ws"], "updates": []}
+                            by_ws[k]["updates"].append({
+                                "range": f"G{tu['row']}",
+                                "values": [[str(tu["tax_id"])]]
+                            })
+                        tax_errors = []
+                        for data in by_ws.values():
+                            try:
+                                sheets_call(lambda d=data: d["ws"].batch_update(
+                                    d["updates"], value_input_option="RAW"
+                                ))
+                                time.sleep(1.0)
+                            except Exception as e:
+                                tax_errors.append(str(e))
+                        if tax_errors:
+                            st.warning(f"Tax ID write warning: {tax_errors}")
+                        else:
+                            st.info(f"✅ Tax IDs written as text ({len(tax_id_updates)} cells)")
                 st.success(f"Done! {total} rows saved")
                 with st.spinner("Cleaning up duplicate empty slots..."):
                     seen_ws = {}
