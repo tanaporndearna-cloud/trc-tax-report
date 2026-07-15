@@ -219,6 +219,33 @@ def format_tax_id_column(ws):
     """Force column G (tax ID) to Plain Text so long numbers don't become scientific notation"""
     sheets_call(lambda: ws.format("G:G", {"numberFormat": {"type": "TEXT"}}))
 
+def write_tax_ids_as_string(ws, row_tax_pairs):
+    """
+    Write tax IDs as explicit STRING values using Sheets API updateCells with stringValue.
+    This BYPASSES the Values API entirely — Google Sheets cannot auto-convert to scientific notation.
+    row_tax_pairs: list of (row_1based, tax_id_str)
+    """
+    if not row_tax_pairs:
+        return
+    sheet_id = ws._properties['sheetId']
+    requests = []
+    for row_1based, tax_id_str in row_tax_pairs:
+        if not tax_id_str:
+            continue
+        requests.append({
+            "updateCells": {
+                "rows": [{"values": [{"userEnteredValue": {"stringValue": str(tax_id_str)}}]}],
+                "fields": "userEnteredValue",
+                "start": {
+                    "sheetId": sheet_id,
+                    "rowIndex": row_1based - 1,   # 0-based
+                    "columnIndex": 6,              # column G (0-based)
+                }
+            }
+        })
+    if requests:
+        sheets_call(lambda: ws.spreadsheet.batch_update({"requests": requests}))
+
 def get_or_create_worksheet(sh, month, be_year):
     name = sheet_name_for_month(month, be_year)
     try:
@@ -506,95 +533,4 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
     if preview_rows:
         insert_count = sum(1 for op in write_ops if op["is_insert"])
         note = f" ({insert_count} inserted rows)" if insert_count else ""
-        st.success(f"Found **{len(preview_rows)} rows** to write{note}")
-        st.dataframe(pd.DataFrame(preview_rows), use_container_width=True, hide_index=True)
-
-        st.subheader("4.  Save to Google Sheet")
-        st.info("Multi-line docs will INSERT new rows — invoice numbers will not be deleted")
-
-        if st.button("Save to Google Sheet", type="primary", use_container_width=False):
-            progress_bar = st.progress(0, text="Saving...")
-            errors = []
-            total = len(st.session_state["write_ops"])
-            row_offsets = {}
-            tax_id_updates = []  # collect (ws, actual_row, tax_id) for batch RAW write
-
-            doc_last_row = {}
-            for i, op in enumerate(st.session_state["write_ops"]):
-                ws = op["ws"]
-                sname = op["sheet_name"]
-                offset = row_offsets.get(sname, 0)
-                inv_no = op["inv_no"]
-                if op["is_insert"]:
-                    actual_row = doc_last_row[inv_no] + 1
-                else:
-                    actual_row = op["row_idx"] + offset
-                try:
-                    tax_id_str = str(op.get("tax_id", ""))
-                    if op["is_insert"]:
-                        row_data = [op["date_str"]] + list(op["values"])
-                        row_data[6] = ""  # index 6 = col G (date+values[5]) — write tax ID as RAW below
-                        row_data[11] = f"=K{actual_row}*0.07"
-                        row_data[12] = f"=K{actual_row}+L{actual_row}"
-                        sheets_call(lambda rd=row_data, ar=actual_row: ws.insert_rows([rd], ar, inherit_from_before=True, value_input_option="USER_ENTERED"))
-                        row_offsets[sname] = offset + 1
-                    else:
-                        row_values = list(op["values"])
-                        row_values[5] = ""  # index 5 = col G — write tax ID as RAW below
-                        row_values[10] = f"=K{actual_row}*0.07"
-                        row_values[11] = f"=K{actual_row}+L{actual_row}"
-                        sheets_call(lambda rv=row_values, ar=actual_row: ws.update(f"B{ar}:O{ar}", [rv], value_input_option="USER_ENTERED"))
-                    # Write tax ID as RAW string — forces Google Sheets to store as TEXT (no scientific notation)
-                    if tax_id_str:
-                        sheets_call(lambda t=tax_id_str, ar=actual_row, w=ws: w.update(f"G{ar}", [[t]], value_input_option="RAW"))
-                    doc_last_row[inv_no] = actual_row
-                    tax_id_updates.append({"ws": ws, "row": actual_row, "tax_id": tax_id_str})
-                    time.sleep(1.5)
-                except Exception as e:
-                    errors.append(f"{inv_no} ({sname}): {e}")
-                action = "insert" if op["is_insert"] else "save"
-                progress_bar.progress((i + 1) / total, text=f"{action} {inv_no} ({sname})... ({i+1}/{total})")
-
-            if errors:
-                st.error("Some errors:\n" + "\n".join(errors))
-            else:
-                # Write tax IDs as RAW text using ws.batch_update (values API)
-                # RAW mode + Python string = stored as text in Sheets, no scientific notation
-                if tax_id_updates:
-                    with st.spinner(f"Writing {len(tax_id_updates)} tax IDs as text..."):
-                        by_ws = {}
-                        for tu in tax_id_updates:
-                            k = id(tu["ws"])
-                            if k not in by_ws:
-                                by_ws[k] = {"ws": tu["ws"], "updates": []}
-                            by_ws[k]["updates"].append({
-                                "range": f"G{tu['row']}",
-                                "values": [[str(tu["tax_id"])]]
-                            })
-                        tax_errors = []
-                        for data in by_ws.values():
-                            try:
-                                sheets_call(lambda d=data: d["ws"].batch_update(
-                                    d["updates"], value_input_option="RAW"
-                                ))
-                                time.sleep(1.0)
-                            except Exception as e:
-                                tax_errors.append(str(e))
-                        if tax_errors:
-                            st.warning(f"Tax ID write warning: {tax_errors}")
-                        else:
-                            st.info(f"✅ Tax IDs written as text ({len(tax_id_updates)} cells)")
-                st.success(f"Done! {total} rows saved")
-                with st.spinner("Cleaning up duplicate empty slots..."):
-                    seen_ws = {}
-                    for op in st.session_state["write_ops"]:
-                        sname = op["sheet_name"]
-                        if sname not in seen_ws:
-                            seen_ws[sname] = op["ws"]
-                    cleaned = 0
-                    for sname, ws in seen_ws.items():
-                        n = cleanup_empty_slots(ws)
-                        cleaned += n
-                    if cleaned:
-                        st.info(f"Removed {cleaned} duplicate empty slot(s)")
-             
+        st.success(f"Found *
