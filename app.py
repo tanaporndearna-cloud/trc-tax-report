@@ -84,9 +84,8 @@ def abbreviate_item(text):
     consonants = [c for c in letters.upper() if c not in "AEIOU"]
     abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (letters[:2].upper() if letters else "??")
     if product:
-        # Keep only the product type — strip trailing English codes (MDL, OEM, TR-D)
-        # and trailing quantities (2 ชิ้น, 3 ชิ้น)
-        product = re.sub(r'(\s+[A-Z][A-Z0-9\-]+)+$', '', product).strip()
+        # Strip trailing quantities only (2 ชิ้น, 3 ชิ้น)
+        # Keep trailing codes like TR-D, M-GEN, ACCESS, ZX, ตรงรุ่น
         product = re.sub(r'\s+\d+\s+\S+$', '', product).strip()
         return f"{abbr}{year2} {product}"
     return f"{abbr}{year2}"
