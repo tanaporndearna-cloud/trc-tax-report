@@ -124,9 +124,14 @@ def populate_new_worksheet(ws, month, be_year):
             inv_no = f"{be_year}{month:02d}{seq:03d}"
             rows.append([date_str, inv_no])
             seq += 1
-    # rows 1-2 = header (blank), rows 3+ = slots
-    all_rows = [["", ""], ["", ""]] + rows
-    sheets_call(lambda: ws.update(f"A1:B{len(all_rows)}", all_rows))
+    header1 = [
+        "วันที่", "เลขที่ใบกำกับภาษี", "สาขา", "เลขที่เอกสาร",
+        "ชื่อลูกค้า", "ที่อยู่", "เลขประจำตัวผู้เสียภาษี", "รายการ",
+        "จำนวน", "ราคา/หน่วย", "ยอดขาย", "ภาษีมูลค่าเพิ่ม", "รวม",
+        "ช่องทาง", "อีเมล",
+    ]
+    all_rows = [header1, []] + rows
+    sheets_call(lambda: ws.update(f"A1:O{len(all_rows)}", all_rows))
 
 def get_or_create_worksheet(sh, month, be_year):
     name = sheet_name_for_month(month, be_year)
@@ -438,6 +443,4 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                 st.error("Some errors:\n" + "\n".join(errors))
             else:
                 st.success(f"Done! {total} rows saved")
-                st.balloons()
-    else:
-        st.info("No new data to write (all docs already processed or no matching slots)")
+             
