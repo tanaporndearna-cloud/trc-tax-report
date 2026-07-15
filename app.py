@@ -84,9 +84,14 @@ def abbreviate_item(text):
     consonants = [c for c in letters.upper() if c not in "AEIOU"]
     abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (letters[:2].upper() if letters else "??")
     if product:
-        # Strip trailing quantities only (2 ชิ้น, 3 ชิ้น)
-        # Keep trailing codes like TR-D, M-GEN, ACCESS, ZX, ตรงรุ่น
-        product = re.sub(r'\s+\d+\s+\S+$', '', product).strip()
+        # Take only the first product-type word (Thai compound noun, no spaces)
+        # If first token is non-Thai prefix (e.g. "5D", "ZX"), include next word too
+        parts = product.split(' ')
+        first = parts[0]
+        if len(parts) > 1 and re.match(r'^[A-Za-z0-9\-]+$', first):
+            product = ' '.join(parts[:2])
+        else:
+            product = first
         return f"{abbr}{year2} {product}"
     return f"{abbr}{year2}"
 
