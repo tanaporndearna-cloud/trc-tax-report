@@ -447,12 +447,16 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
             total = len(st.session_state["write_ops"])
             row_offsets = {}
 
+            doc_last_row = {}
             for i, op in enumerate(st.session_state["write_ops"]):
                 ws = op["ws"]
                 sname = op["sheet_name"]
                 offset = row_offsets.get(sname, 0)
-                actual_row = op["row_idx"] + offset
                 inv_no = op["inv_no"]
+                if op["is_insert"]:
+                    actual_row = doc_last_row[inv_no] + 1
+                else:
+                    actual_row = op["row_idx"] + offset
                 try:
                     if op["is_insert"]:
                         row_data = [op["date_str"]] + list(op["values"])
@@ -465,6 +469,7 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                         row_values[10] = f"=K{actual_row}*0.07"
                         row_values[11] = f"=K{actual_row}+L{actual_row}"
                         sheets_call(lambda rv=row_values, ar=actual_row: ws.update(f"B{ar}:O{ar}", [rv], value_input_option="USER_ENTERED"))
+                    doc_last_row[inv_no] = actual_row
                     time.sleep(1.5)
                 except Exception as e:
                     errors.append(f"{inv_no} ({sname}): {e}")
