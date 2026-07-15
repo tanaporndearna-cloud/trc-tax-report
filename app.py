@@ -530,19 +530,25 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                 else:
                     actual_row = op["row_idx"] + offset
                 try:
+                    tax_id_str = str(op.get("tax_id", ""))
                     if op["is_insert"]:
                         row_data = [op["date_str"]] + list(op["values"])
+                        row_data[6] = ""  # index 6 = col G (date+values[5]) — write tax ID as RAW below
                         row_data[11] = f"=K{actual_row}*0.07"
                         row_data[12] = f"=K{actual_row}+L{actual_row}"
                         sheets_call(lambda rd=row_data, ar=actual_row: ws.insert_rows([rd], ar, inherit_from_before=True, value_input_option="USER_ENTERED"))
                         row_offsets[sname] = offset + 1
                     else:
                         row_values = list(op["values"])
+                        row_values[5] = ""  # index 5 = col G — write tax ID as RAW below
                         row_values[10] = f"=K{actual_row}*0.07"
                         row_values[11] = f"=K{actual_row}+L{actual_row}"
                         sheets_call(lambda rv=row_values, ar=actual_row: ws.update(f"B{ar}:O{ar}", [rv], value_input_option="USER_ENTERED"))
+                    # Write tax ID as RAW string — forces Google Sheets to store as TEXT (no scientific notation)
+                    if tax_id_str:
+                        sheets_call(lambda t=tax_id_str, ar=actual_row, w=ws: w.update(f"G{ar}", [[t]], value_input_option="RAW"))
                     doc_last_row[inv_no] = actual_row
-                    tax_id_updates.append({"ws": ws, "row": actual_row, "tax_id": op.get("tax_id", "")})
+                    tax_id_updates.append({"ws": ws, "row": actual_row, "tax_id": tax_id_str})
                     time.sleep(1.5)
                 except Exception as e:
                     errors.append(f"{inv_no} ({sname}): {e}")
