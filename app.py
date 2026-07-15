@@ -6,6 +6,7 @@ import re
 import io
 import json
 import time
+import calendar as _cal
 from datetime import date, datetime
 from google.oauth2.service_account import Credentials
 
@@ -108,13 +109,32 @@ def sheets_call(fn, max_retries=6):
             else:
                 raise
 
+def populate_new_worksheet(ws, month, be_year):
+    """Fill 20 slots per day for every day in the month"""
+    ce_year = be_year - 543
+    days_in_month = _cal.monthrange(ce_year, month)[1]
+    rows = []
+    seq = 1
+    for day in range(1, days_in_month + 1):
+        date_str = f"{day:02d}/{month:02d}/{be_year}"
+        for _ in range(20):
+            inv_no = f"{be_year}{month:02d}{seq:03d}"
+            rows.append([date_str, inv_no])
+            seq += 1
+    # rows 1-2 = header (blank), rows 3+ = slots
+    all_rows = [["", ""], ["", ""]] + rows
+    sheets_call(lambda: ws.update(f"A1:B{len(all_rows)}", all_rows))
+
 def get_or_create_worksheet(sh, month, be_year):
     name = sheet_name_for_month(month, be_year)
     try:
         ws = sh.worksheet(name)
         return ws, False
     except gspread.exceptions.WorksheetNotFound:
-        ws = sh.add_worksheet(title=name, rows=500, cols=20)
+        ce_year = be_year - 543
+        days_in_month = _cal.monthrange(ce_year, month)[1]
+        ws = sh.add_worksheet(title=name, rows=days_in_month * 20 + 10, cols=20)
+        populate_new_worksheet(ws, month, be_year)
         return ws, True
 
 def read_tax_sheet_ws(ws):
@@ -370,7 +390,7 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
             st.stop()
 
     if new_sheets:
-        st.warning(f"Created new sheets: {', '.join(new_sheets)} — please add invoice number slots before saving")
+        st.success(f"Created new sheets with 20 slots/day: {', '.join(new_sheets)}")
 
     if preview_rows:
         insert_count = sum(1 for op in write_ops if op["is_insert"])
@@ -405,10 +425,9 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                         row_values[10] = f"=K{actual_row}*0.07"
                         row_values[11] = f"=K{actual_row}+L{actual_row}"
                         sheets_call(lambda rv=row_values, ar=actual_row: ws.update(f"B{ar}:O{ar}", [rv], value_input_option="USER_ENTERED"))
-                    time.sleep(0.5)  # ป้องกัน quota 429
+                    time.sleep(0.5)
                 except Exception as e:
                     errors.append(f"{inv_no} ({sname}): {e}")
-                action = "insert" if op["is_insert"] else "save"
                 action = "insert" if op["is_insert"] else "save"
                 progress_bar.progress((i + 1) / total, text=f"{action} {inv_no} ({sname})... ({i+1}/{total})")
 
