@@ -215,16 +215,22 @@ def populate_new_worksheet(ws, month, be_year):
     all_rows = [title_row, header2] + rows
     sheets_call(lambda: ws.update(f"A1:O{len(all_rows)}", all_rows))
 
+def format_tax_id_column(ws):
+    """Force column G (tax ID) to Plain Text so long numbers don't become scientific notation"""
+    sheets_call(lambda: ws.format("G:G", {"numberFormat": {"type": "TEXT"}}))
+
 def get_or_create_worksheet(sh, month, be_year):
     name = sheet_name_for_month(month, be_year)
     try:
         ws = sh.worksheet(name)
+        format_tax_id_column(ws)
         return ws, False
     except gspread.exceptions.WorksheetNotFound:
         ce_year = be_year - 543
         days_in_month = _cal.monthrange(ce_year, month)[1]
         ws = sh.add_worksheet(title=name, rows=days_in_month * 20 + 10, cols=20)
         populate_new_worksheet(ws, month, be_year)
+        format_tax_id_column(ws)
         return ws, True
 
 def read_tax_sheet_ws(ws):
