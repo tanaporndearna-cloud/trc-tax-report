@@ -110,12 +110,15 @@ def sheets_call(fn, max_retries=6):
                 raise
 
 def populate_new_worksheet(ws, month, be_year):
-    """Fill 20 slots per day for every day in the month"""
+    """Fill 20 slots per day (skip Sundays) for every day in the month"""
     ce_year = be_year - 543
     days_in_month = _cal.monthrange(ce_year, month)[1]
     rows = []
     seq = 1
     for day in range(1, days_in_month + 1):
+        d = date(ce_year, month, day)
+        if d.weekday() == 6:  # 6 = Sunday
+            continue
         date_str = f"{day:02d}/{month:02d}/{be_year}"
         for _ in range(20):
             inv_no = f"{be_year}{month:02d}{seq:03d}"
