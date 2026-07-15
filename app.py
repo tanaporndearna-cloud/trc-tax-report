@@ -317,13 +317,22 @@ def process(erp_bytes, form_data, sh):
             date_slots[k].sort()
 
         doc_info = {}
+        date_fail = 0
         for doc_no in month_docs:
             if doc_no in written_docs:
                 continue
             rows_for_doc = erp_map[doc_no]
-            txn_date = parse_erp_date(rows_for_doc[0][ERP_COLS["TransDate"]])
+            raw_date = rows_for_doc[0][ERP_COLS["TransDate"]]
+            txn_date = parse_erp_date(raw_date)
             if txn_date:
                 doc_info[doc_no] = {"date": txn_date, "date_str": be_date_str(txn_date)}
+            else:
+                date_fail += 1
+        if date_fail:
+            sample_raw = erp_map[month_docs[0]][0][ERP_COLS["TransDate"]]
+            st.warning(f"⚠️ {date_fail} doc(s) skipped: date parse failed. Sample date value: '{sample_raw}'")
+        if not doc_info:
+            st.warning(f"⚠️ No docs to write for {sname} (matched={len(month_docs)}, date_fail={date_fail}, written={len(written_docs)})")
 
         sorted_docs = sorted(doc_info, key=lambda d: (doc_info[d]["date"], d))
         date_cursor = {}
