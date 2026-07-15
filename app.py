@@ -115,6 +115,30 @@ def sheets_call(fn, max_retries=6):
             else:
                 raise
 
+def cleanup_empty_slots(ws):
+    """Remove pre-allocated empty slots whose inv_no already has data written (duplicate after insert)"""
+    rows = ws.get_all_values()
+    written_inv = set()
+    for i, row in enumerate(rows):
+        if i < 2:
+            continue
+        inv_no = row[1].strip() if len(row) > 1 else ""
+        doc_no = row[3].strip() if len(row) > 3 else ""
+        if inv_no and doc_no:
+            written_inv.add(inv_no)
+    empty_rows = []
+    for i, row in enumerate(rows):
+        if i < 2:
+            continue
+        inv_no = row[1].strip() if len(row) > 1 else ""
+        doc_no = row[3].strip() if len(row) > 3 else ""
+        if inv_no and not doc_no and inv_no in written_inv:
+            empty_rows.append(i + 1)
+    for row_num in reversed(empty_rows):
+        sheets_call(lambda r=row_num: ws.delete_rows(r))
+        time.sleep(1.0)
+    return len(empty_rows)
+
 def populate_new_worksheet(ws, month, be_year):
     """Fill 20 slots per day (skip Sundays) for every day in the month"""
     ce_year = be_year - 543
@@ -451,4 +475,16 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                 st.error("Some errors:\n" + "\n".join(errors))
             else:
                 st.success(f"Done! {total} rows saved")
+                with st.spinner("Cleaning up duplicate empty slots..."):
+                    seen_ws = {}
+                    for op in st.session_state["write_ops"]:
+                        sname = op["sheet_name"]
+                        if sname not in seen_ws:
+                            seen_ws[sname] = op["ws"]
+                    cleaned = 0
+                    for sname, ws in seen_ws.items():
+                        n = cleanup_empty_slots(ws)
+                        cleaned += n
+                    if cleaned:
+                        st.info(f"Removed {cleaned} duplicate empty slot(s)")
              
