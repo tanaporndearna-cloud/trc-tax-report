@@ -62,20 +62,24 @@ def clean_item(text, maxlen=30):
     return text
 
 def abbreviate_item(text):
-    """CITY 2008-2012 สปอยเลอร์ -> CT08 สปอยเลอร์
+    """CITY HATCHBACK 2020-2021 ลิ้นหน้า ทรง SPORT -> CT20 ลิ้นหน้า
        YARIS ATIV 2017-2018 ลิ้นหน้า -> YR17 ลิ้นหน้า"""
-    t = text.strip()
-    # Find first 4-digit year (19xx or 20xx)
+    t = text.strip().split("\n")[0].strip()
+    # Strip trailing parenthetical content
+    t = re.sub(r'\s*[\(\[][^\)\]]{0,60}[\)\]]\s*$', '', t).strip()
+    # Strip "ทรง..." and everything after
+    m_trng = re.search(r'\s+ทรง\b', t)
+    if m_trng:
+        t = t[:m_trng.start()].strip()
+    # Find first 4-digit year
     ym = re.search(r'((?:19|20)\d{2})', t)
     if not ym:
-        return t  # no year — return as-is
+        return t[:25]  # no year — return truncated
     year2 = ym.group(1)[-2:]
     model_part = t[:ym.start()].strip()
-    # Find product: text after the full year range (e.g. 2017-2018)
     yr_range = re.search(r'(?:19|20)\d{2}(?:-(?:19|20)\d{2})?', t)
     product = t[yr_range.end():].strip() if yr_range else ""
     product = re.sub(r'^[\s\(\[\-]+', '', product).strip()
-    # Build abbreviation from consonants of model_part
     letters = re.sub(r'[^A-Za-z]', '', model_part)
     consonants = [c for c in letters.upper() if c not in "AEIOU"]
     abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (letters[:2].upper() if letters else "??")
@@ -319,7 +323,7 @@ def process(erp_bytes, form_data, sh):
                 except Exception:
                     qty = 0.0
                 if prop and price > 0:
-                    lines.append({"name": abbreviate_item(clean_item(desc if desc else prop)), "qty": int(qty), "price": price})
+                    lines.append({"name": abbreviate_item(desc if desc else prop), "qty": int(qty), "price": price})
             if not lines:
                 continue
 
