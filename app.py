@@ -5,6 +5,7 @@ import csv
 import re
 import io
 import json
+import time
 from datetime import date, datetime
 from google.oauth2.service_account import Credentials
 
@@ -94,6 +95,18 @@ def parse_month_from_doc(doc_no):
 
 def sheet_name_for_month(month, be_year):
     return f"{month:02d}/{be_year}"
+
+def sheets_call(fn, max_retries=6):
+    """Retry on quota 429 with exponential backoff"""
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except gspread.exceptions.APIError as e:
+            if "429" in str(e) and attempt < max_retries - 1:
+                wait = 2 ** attempt  # 1,2,4,8,16,32 sec
+                time.sleep(wait)
+            else:
+                raise
 
 def get_or_create_worksheet(sh, month, be_year):
     name = sheet_name_for_month(month, be_year)
@@ -385,13 +398,14 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                         row_data = [op["date_str"]] + list(op["values"])
                         row_data[11] = f"=K{actual_row}*0.07"
                         row_data[12] = f"=K{actual_row}+L{actual_row}"
-                        ws.insert_rows([row_data], actual_row, inherit_from_before=True, value_input_option="USER_ENTERED")
+                        sheets_call(lambda rd=row_data, ar=actual_row: ws.insert_rows([rd], ar, inherit_from_before=True, value_input_option="USER_ENTERED"))
                         row_offsets[sname] = offset + 1
                     else:
                         row_values = list(op["values"])
                         row_values[10] = f"=K{actual_row}*0.07"
                         row_values[11] = f"=K{actual_row}+L{actual_row}"
-                        ws.update(f"B{actual_row}:O{actual_row}", [row_values], value_input_option="USER_ENTERED")
+                        sheets_call(lambda rv=row_values, ar=actual_row: ws.update(f"B{ar}:O{ar}", [rv], value_input_option="USER_ENTERED"))
+                    time.sleep(0.5)  # ป้องกัน quota 429
                 except Exception as e:
                     errors.append(f"{inv_no} ({sname}): {e}")
                 action = "insert" if op["is_insert"] else "save"
