@@ -84,8 +84,15 @@ def abbreviate_item(text):
     consonants = [c for c in letters.upper() if c not in "AEIOU"]
     abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (letters[:2].upper() if letters else "??")
     if product:
-        return f"{abbr}{year2} {product}"
-    return f"{abbr}{year2}"
+        result = f"{abbr}{year2} {product}"
+    else:
+        result = f"{abbr}{year2}"
+    # Truncate to 30 chars at word boundary
+    if len(result) > 30:
+        cut = result[:30]
+        ls = cut.rfind(" ")
+        result = cut[:ls].rstrip() if ls > 5 else cut
+    return result
 
 def parse_erp_date(s):
     try:
