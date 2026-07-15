@@ -47,6 +47,19 @@ ERP_COLS = {
 def clean_name(n):
     return re.sub(r"^#\d+\s+", "", n).strip()
 
+def parse_sales_user(text):
+    """'อัญชุลี (นัท T12)' -> 'T12'  |  'หทัยชนก (เอ)' -> 'เอ'"""
+    text = text.strip()
+    # Find T1-T18 anywhere in string
+    m = re.search(r'\bT(1[0-8]|[1-9])\b', text)
+    if m:
+        return m.group(0)
+    # Fall back: content inside parentheses
+    m = re.search(r'\(([^)]+)\)', text)
+    if m:
+        return m.group(1).strip()
+    return text
+
 def clean_item(text, maxlen=30):
     text = text.split("\n")[0].strip()
     text = re.sub(r"\s*[\(\[][^\)\]]{0,40}[\)\]]\s*$", "", text).strip()
@@ -264,6 +277,10 @@ def process(erp_bytes, form_data, sh):
         branch_col = header.index("ShipToBranchNumber")
     except ValueError:
         branch_col = ERP_COLS["UserRealSurName"]
+    try:
+        sales_user_col = header.index("SalesUserAccount")
+    except ValueError:
+        sales_user_col = None
 
     erp_map = {}
     for row in erp_rows:
@@ -349,9 +366,10 @@ def process(erp_bytes, form_data, sh):
                 sale  = round(line["qty"] * line["price"], 2)
                 vat   = round(sale * 0.07, 2)
                 total = round(sale + vat, 2)
+                raw_su = first[sales_user_col].strip() if (sales_user_col is not None and sales_user_col < len(first)) else ""
                 values = [
                     inv_no,
-                    first[branch_col].strip() if branch_col < len(first) else "",
+                    parse_sales_user(raw_su) if raw_su else (first[branch_col].strip() if branch_col < len(first) else ""),
                     doc_no,
                     clean_name(first[ERP_COLS["OrderName"]].strip()),
                     first[ERP_COLS["OrderAddress"]].strip(),
