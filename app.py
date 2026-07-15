@@ -62,16 +62,26 @@ def clean_item(text, maxlen=30):
     return text
 
 def abbreviate_item(text):
-    """CITY 2008-2012 สปอยเลอร์  ->  CT08 สปอยเลอร์"""
-    m = re.match(r'^([A-Za-z0-9]+)\s+(\d{4})(?:-\d{4})?\s+(.*)', text.strip())
-    if not m:
-        return text
-    model = m.group(1)
-    year2 = m.group(2)[-2:]
-    product = m.group(3).strip()
-    consonants = [c for c in model.upper() if c.isalpha() and c not in "AEIOU"]
-    abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (model[:2].upper())
-    return f"{abbr}{year2} {product}"
+    """CITY 2008-2012 สปอยเลอร์ -> CT08 สปอยเลอร์
+       YARIS ATIV 2017-2018 ลิ้นหน้า -> YR17 ลิ้นหน้า"""
+    t = text.strip()
+    # Find first 4-digit year (19xx or 20xx)
+    ym = re.search(r'((?:19|20)\d{2})', t)
+    if not ym:
+        return t  # no year — return as-is
+    year2 = ym.group(1)[-2:]
+    model_part = t[:ym.start()].strip()
+    # Find product: text after the full year range (e.g. 2017-2018)
+    yr_range = re.search(r'(?:19|20)\d{2}(?:-(?:19|20)\d{2})?', t)
+    product = t[yr_range.end():].strip() if yr_range else ""
+    product = re.sub(r'^[\s\(\[\-]+', '', product).strip()
+    # Build abbreviation from consonants of model_part
+    letters = re.sub(r'[^A-Za-z]', '', model_part)
+    consonants = [c for c in letters.upper() if c not in "AEIOU"]
+    abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (letters[:2].upper() if letters else "??")
+    if product:
+        return f"{abbr}{year2} {product}"
+    return f"{abbr}{year2}"
 
 def parse_erp_date(s):
     try:
