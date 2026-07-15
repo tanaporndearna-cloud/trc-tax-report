@@ -109,11 +109,14 @@ def abbreviate_item(text):
     return f"{abbr}{year2}"
 
 def parse_erp_date(s):
-    try:
-        dt = datetime.strptime(s.strip(), "%m/%d/%Y %I:%M:%S %p")
-        return date(dt.year, dt.month, dt.day)
-    except Exception:
-        return None
+    s = s.strip()
+    for fmt in ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M", "%m/%d/%Y"):
+        try:
+            dt = datetime.strptime(s, fmt)
+            return date(dt.year, dt.month, dt.day)
+        except Exception:
+            continue
+    return None
 
 def be_date_str(d):
     return f"{d.day:02d}/{d.month:02d}/{d.year + 543}"
@@ -334,9 +337,9 @@ def process(erp_bytes, form_data, sh):
         if not doc_info:
             st.warning(f"⚠️ No docs to write for {sname} (matched={len(month_docs)}, date_fail={date_fail}, written={len(written_docs)})")
 
+        sname = sheet_name_for_month(month, be_year)
         sorted_docs = sorted(doc_info, key=lambda d: (doc_info[d]["date"], d))
         date_cursor = {}
-        sname = sheet_name_for_month(month, be_year)
 
         for doc_no in sorted_docs:
             d_str = doc_info[doc_no]["date_str"]
