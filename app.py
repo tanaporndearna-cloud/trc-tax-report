@@ -382,13 +382,19 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                 inv_no = op["inv_no"]
                 try:
                     if op["is_insert"]:
-                        row_data = [op["date_str"]] + op["values"]
-                        ws.insert_rows([row_data], actual_row, inherit_from_before=True)
+                        row_data = [op["date_str"]] + list(op["values"])
+                        row_data[11] = f"=K{actual_row}*0.07"
+                        row_data[12] = f"=K{actual_row}+L{actual_row}"
+                        ws.insert_rows([row_data], actual_row, inherit_from_before=True, value_input_option="USER_ENTERED")
                         row_offsets[sname] = offset + 1
                     else:
-                        ws.update(f"B{actual_row}:O{actual_row}", [op["values"]])
+                        row_values = list(op["values"])
+                        row_values[10] = f"=K{actual_row}*0.07"
+                        row_values[11] = f"=K{actual_row}+L{actual_row}"
+                        ws.update(f"B{actual_row}:O{actual_row}", [row_values], value_input_option="USER_ENTERED")
                 except Exception as e:
                     errors.append(f"{inv_no} ({sname}): {e}")
+                action = "insert" if op["is_insert"] else "save"
                 action = "insert" if op["is_insert"] else "save"
                 progress_bar.progress((i + 1) / total, text=f"{action} {inv_no} ({sname})... ({i+1}/{total})")
 
@@ -398,5 +404,4 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                 st.success(f"Done! {total} rows saved")
                 st.balloons()
     else:
-        all_written = sum(1 for op in write_ops for _ in [op]) if write_ops else 0
         st.info("No new data to write (all docs already processed or no matching slots)")
