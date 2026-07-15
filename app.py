@@ -10,6 +10,12 @@ import calendar as _cal
 from datetime import date, datetime
 from google.oauth2.service_account import Credentials
 
+THAI_MONTHS = [
+    "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
+    "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม",
+    "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+]
+
 FORM_SHEET_ID       = "1O8x5pN7exw44wUEYOd_VcdIJ4xkc-PE8kHJmJMPSdsg"
 TAX_REPORT_SHEET_ID = "1bApVK4OjhlkaAIRVeslPIryyjNymeEz1VVVJA99dKvk"
 
@@ -124,13 +130,15 @@ def populate_new_worksheet(ws, month, be_year):
             inv_no = f"{be_year}{month:02d}{seq:03d}"
             rows.append([date_str, inv_no])
             seq += 1
-    header1 = [
-        "วันที่", "เลขที่ใบกำกับภาษี", "สาขา", "เลขที่เอกสาร",
+    month_name = THAI_MONTHS[month]
+    title_row = [f"รายงานภาษีขายประจำเดือน {month_name} {be_year}"] + [""] * 14
+    header2 = [
+        "ว.ด.ป.", "เลขที่", "สาขา", "เลขที่ ABB",
         "ชื่อลูกค้า", "ที่อยู่", "เลขประจำตัวผู้เสียภาษี", "รายการ",
-        "จำนวน", "ราคา/หน่วย", "ยอดขาย", "ภาษีมูลค่าเพิ่ม", "รวม",
-        "ช่องทาง", "อีเมล",
+        "จำนวน (ชิ้น)", "หน่วยละ (บาท)", "ยอดขาย", "ภาษีมูลค่าเพิ่ม", "รวม",
+        "ช่องทางการรับเอกสาร", "อีเมล/ที่อยู่จัดส่ง",
     ]
-    all_rows = [header1, []] + rows
+    all_rows = [title_row, header2] + rows
     sheets_call(lambda: ws.update(f"A1:O{len(all_rows)}", all_rows))
 
 def get_or_create_worksheet(sh, month, be_year):
