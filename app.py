@@ -552,24 +552,29 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
             if errors:
                 st.error("Some errors:\n" + "\n".join(errors))
             else:
-                # Batch-write tax IDs as RAW strings (prevents scientific notation)
+                # Batch-write tax IDs using explicit stringValue (Sheets API batchUpdate)
+                # This is the only way to guarantee the value is stored as TEXT, not a number
                 if tax_id_updates:
                     with st.spinner("Writing tax IDs as text..."):
-                        # Group by worksheet object id
-                        ws_groups = {}
-                        for tu in tax_id_updates:
-                            ws_obj = tu["ws"]
-                            key = id(ws_obj)
-                            if key not in ws_groups:
-                                ws_groups[key] = {"ws": ws_obj, "cells": []}
-                            ws_groups[key]["cells"].append(
-                                gspread.Cell(tu["row"], 7, tu["tax_id"])
-                            )
-                        for group in ws_groups.values():
-                            sheets_call(lambda g=group: g["ws"].update_cells(
-                                g["cells"], value_input_option="RAW"
-                            ))
-                            time.sleep(1.0)
+                        spreadsheet = tax_id_updates[0]["ws"].spreadsheet
+                        requests = [
+                            {
+                                "updateCells": {
+                                    "range": {
+                                        "sheetId": tu["ws"].id,
+                                        "startRowIndex": tu["row"] - 1,  # 0-indexed
+                                        "endRowIndex": tu["row"],
+                                        "startColumnIndex": 6,  # column G = index 6
+                                        "endColumnIndex": 7,
+                                    },
+                                    "rows": [{"values": [{"userEnteredValue": {"stringValue": tu["tax_id"]}}]}],
+                                    "fields": "userEnteredValue",
+                                }
+                            }
+                            for tu in tax_id_updates
+                        ]
+                        sheets_call(lambda: spreadsheet.batch_update({"requests": requests}))
+                        time.sleep(1.0)
                 st.success(f"Done! {total} rows saved")
                 with st.spinner("Cleaning up duplicate empty slots..."):
                     seen_ws = {}
