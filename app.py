@@ -110,7 +110,7 @@ def sheets_call(fn, max_retries=6):
             return fn()
         except gspread.exceptions.APIError as e:
             if "429" in str(e) and attempt < max_retries - 1:
-                wait = 2 ** attempt  # 1,2,4,8,16,32 sec
+                wait = 5 * (2 ** attempt)  # 5,10,20,40,80,160 sec
                 time.sleep(wait)
             else:
                 raise
@@ -441,7 +441,7 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                         row_values[10] = f"=K{actual_row}*0.07"
                         row_values[11] = f"=K{actual_row}+L{actual_row}"
                         sheets_call(lambda rv=row_values, ar=actual_row: ws.update(f"B{ar}:O{ar}", [rv], value_input_option="USER_ENTERED"))
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                 except Exception as e:
                     errors.append(f"{inv_no} ({sname}): {e}")
                 action = "insert" if op["is_insert"] else "save"
