@@ -48,10 +48,10 @@ def clean_name(n):
     return re.sub(r"^#\d+\s+", "", n).strip()
 
 def parse_sales_user(text):
-    """'อัญชุลี (นัท T12)' -> 'T12'  |  'หทัยชนก (เอ)' -> 'เอ'"""
+    """'อัญชุลี (นัท T12)' -> 'T12'  |  'น้ำหวานT7' -> 'T7'  |  'หทัยชนก (เอ)' -> 'เอ'"""
     text = text.strip()
-    # Find T1-T18 anywhere in string
-    m = re.search(r'\bT(1[0-8]|[1-9])\b', text)
+    # Find T1-T18 anywhere in string (no \b prefix — Thai chars are \w so boundary fails)
+    m = re.search(r'T(1[0-8]|[1-9])(?!\d)', text)
     if m:
         return m.group(0)
     # Fall back: content inside parentheses
@@ -319,6 +319,7 @@ def process(erp_bytes, form_data, sh):
         for k in date_slots:
             date_slots[k].sort()
 
+        sname = sheet_name_for_month(month, be_year)
         doc_info = {}
         date_fail = 0
         for doc_no in month_docs:
@@ -336,8 +337,6 @@ def process(erp_bytes, form_data, sh):
             st.warning(f"⚠️ {date_fail} doc(s) skipped: date parse failed. Sample date value: '{sample_raw}'")
         if not doc_info:
             st.warning(f"⚠️ No docs to write for {sname} (matched={len(month_docs)}, date_fail={date_fail}, written={len(written_docs)})")
-
-        sname = sheet_name_for_month(month, be_year)
         sorted_docs = sorted(doc_info, key=lambda d: (doc_info[d]["date"], d))
         date_cursor = {}
 
@@ -379,13 +378,16 @@ def process(erp_bytes, form_data, sh):
                 vat   = round(sale * 0.07, 2)
                 total = round(sale + vat, 2)
                 raw_su = first[sales_user_col].strip() if (sales_user_col is not None and sales_user_col < len(first)) else ""
+                raw_tax_id = first[ERP_COLS["OrderTaxId"]].strip()
+                # Prefix apostrophe so Google Sheets keeps it as text (no scientific notation)
+                tax_id_val = ("'" + raw_tax_id) if raw_tax_id else ""
                 values = [
                     inv_no,
                     parse_sales_user(raw_su) if raw_su else (first[branch_col].strip() if branch_col < len(first) else ""),
                     doc_no,
                     clean_name(first[ERP_COLS["OrderName"]].strip()),
                     first[ERP_COLS["OrderAddress"]].strip(),
-                    first[ERP_COLS["OrderTaxId"]].strip(),
+                    tax_id_val,
                     line["name"],
                     line["qty"],
                     line["price"],
