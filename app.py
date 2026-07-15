@@ -68,7 +68,7 @@ def abbreviate_item(text):
     # Strip trailing parenthetical content
     t = re.sub(r'\s*[\(\[][^\)\]]{0,60}[\)\]]\s*$', '', t).strip()
     # Strip "ทรง..." and everything after
-    m_trng = re.search(r'\s+ทรง\b', t)
+    m_trng = re.search(r'\s+ทรง', t)
     if m_trng:
         t = t[:m_trng.start()].strip()
     # Find first 4-digit year
@@ -84,15 +84,12 @@ def abbreviate_item(text):
     consonants = [c for c in letters.upper() if c not in "AEIOU"]
     abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (letters[:2].upper() if letters else "??")
     if product:
-        result = f"{abbr}{year2} {product}"
-    else:
-        result = f"{abbr}{year2}"
-    # Truncate to 30 chars at word boundary
-    if len(result) > 30:
-        cut = result[:30]
-        ls = cut.rfind(" ")
-        result = cut[:ls].rstrip() if ls > 5 else cut
-    return result
+        # Keep only the product type — strip trailing English codes (MDL, OEM, TR-D)
+        # and trailing quantities (2 ชิ้น, 3 ชิ้น)
+        product = re.sub(r'(\s+[A-Z][A-Z0-9\-]+)+$', '', product).strip()
+        product = re.sub(r'\s+\d+\s+\S+$', '', product).strip()
+        return f"{abbr}{year2} {product}"
+    return f"{abbr}{year2}"
 
 def parse_erp_date(s):
     try:
