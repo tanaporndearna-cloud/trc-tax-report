@@ -61,6 +61,18 @@ def clean_item(text, maxlen=30):
         text = t.rstrip()
     return text
 
+def abbreviate_item(text):
+    """CITY 2008-2012 สปอยเลอร์  ->  CT08 สปอยเลอร์"""
+    m = re.match(r'^([A-Za-z0-9]+)\s+(\d{4})(?:-\d{4})?\s+(.*)', text.strip())
+    if not m:
+        return text
+    model = m.group(1)
+    year2 = m.group(2)[-2:]
+    product = m.group(3).strip()
+    consonants = [c for c in model.upper() if c.isalpha() and c not in "AEIOU"]
+    abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (model[:2].upper())
+    return f"{abbr}{year2} {product}"
+
 def parse_erp_date(s):
     try:
         dt = datetime.strptime(s.strip(), "%m/%d/%Y %I:%M:%S %p")
@@ -297,7 +309,7 @@ def process(erp_bytes, form_data, sh):
                 except Exception:
                     qty = 0.0
                 if prop and price > 0:
-                    lines.append({"name": clean_item(desc if desc else prop), "qty": int(qty), "price": price})
+                    lines.append({"name": abbreviate_item(clean_item(desc if desc else prop)), "qty": int(qty), "price": price})
             if not lines:
                 continue
 
