@@ -385,15 +385,13 @@ def process(erp_bytes, form_data, sh):
                 total = round(sale + vat, 2)
                 raw_su = first[sales_user_col].strip() if (sales_user_col is not None and sales_user_col < len(first)) else ""
                 raw_tax_id = first[ERP_COLS["OrderTaxId"]].strip()
-                # Prefix apostrophe so Google Sheets keeps it as text (no scientific notation)
-                tax_id_val = ("'" + raw_tax_id) if raw_tax_id else ""
                 values = [
                     inv_no,
                     parse_sales_user(raw_su) if raw_su else (first[branch_col].strip() if branch_col < len(first) else ""),
                     doc_no,
                     clean_name(first[ERP_COLS["OrderName"]].strip()),
                     first[ERP_COLS["OrderAddress"]].strip(),
-                    tax_id_val,
+                    raw_tax_id,  # will be rewritten as RAW string after all rows are saved
                     line["name"],
                     line["qty"],
                     line["price"],
@@ -411,6 +409,7 @@ def process(erp_bytes, form_data, sh):
                     "values":     values,
                     "is_insert":  i > 0,
                     "date_str":   d_str,
+                    "tax_id":     raw_tax_id,
                 })
                 preview_rows.append({
                     "Sheet":      sname,
@@ -518,6 +517,7 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
             errors = []
             total = len(st.session_state["write_ops"])
             row_offsets = {}
+            tax_id_updates = []  # collect (ws, actual_row, tax_id) for batch RAW write
 
             doc_last_row = {}
             for i, op in enumerate(st.session_state["write_ops"]):
@@ -542,6 +542,7 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                         row_values[11] = f"=K{actual_row}+L{actual_row}"
                         sheets_call(lambda rv=row_values, ar=actual_row: ws.update(f"B{ar}:O{ar}", [rv], value_input_option="USER_ENTERED"))
                     doc_last_row[inv_no] = actual_row
+                    tax_id_updates.append({"ws": ws, "row": actual_row, "tax_id": op.get("tax_id", "")})
                     time.sleep(1.5)
                 except Exception as e:
                     errors.append(f"{inv_no} ({sname}): {e}")
@@ -551,6 +552,24 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
             if errors:
                 st.error("Some errors:\n" + "\n".join(errors))
             else:
+                # Batch-write tax IDs as RAW strings (prevents scientific notation)
+                if tax_id_updates:
+                    with st.spinner("Writing tax IDs as text..."):
+                        # Group by worksheet object id
+                        ws_groups = {}
+                        for tu in tax_id_updates:
+                            ws_obj = tu["ws"]
+                            key = id(ws_obj)
+                            if key not in ws_groups:
+                                ws_groups[key] = {"ws": ws_obj, "cells": []}
+                            ws_groups[key]["cells"].append(
+                                gspread.Cell(tu["row"], 7, tu["tax_id"])
+                            )
+                        for group in ws_groups.values():
+                            sheets_call(lambda g=group: g["ws"].update_cells(
+                                g["cells"], value_input_option="RAW"
+                            ))
+                            time.sleep(1.0)
                 st.success(f"Done! {total} rows saved")
                 with st.spinner("Cleaning up duplicate empty slots..."):
                     seen_ws = {}
