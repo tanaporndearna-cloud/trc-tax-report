@@ -121,6 +121,7 @@ def parse_erp_date(s):
 def be_date_str(d):
     return f"{d.day:02d}/{d.month:02d}/{d.year + 543}"
 
+
 def parse_erp_csv(file_bytes):
     for enc in ("cp874", "tis-620", "utf-8-sig", "utf-8"):
         try:
@@ -533,7 +534,6 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
     if preview_rows:
         insert_count = sum(1 for op in write_ops if op["is_insert"])
         note = f" ({insert_count} inserted rows)" if insert_count else ""
-        note = f" ({insert_count} inserted rows)" if insert_count else ""
         st.success(f"Found **{len(preview_rows)} rows** to write{note}")
         st.dataframe(pd.DataFrame(preview_rows), use_container_width=True, hide_index=True)
 
@@ -560,12 +560,14 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                 try:
                     if op["is_insert"]:
                         row_data = [op["date_str"]] + list(op["values"])
+                        row_data[10] = f"=I{actual_row}*J{actual_row}"
                         row_data[11] = f"=K{actual_row}*0.07"
                         row_data[12] = f"=K{actual_row}+L{actual_row}"
                         sheets_call(lambda rd=row_data, ar=actual_row: ws.insert_rows([rd], ar, inherit_from_before=True, value_input_option="USER_ENTERED"))
                         row_offsets[sname] = offset + 1
                     else:
                         row_values = list(op["values"])
+                        row_values[9]  = f"=I{actual_row}*J{actual_row}"
                         row_values[10] = f"=K{actual_row}*0.07"
                         row_values[11] = f"=K{actual_row}+L{actual_row}"
                         sheets_call(lambda rv=row_values, ar=actual_row: ws.update(f"B{ar}:O{ar}", [rv], value_input_option="USER_ENTERED"))
