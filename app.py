@@ -300,11 +300,14 @@ def read_form_responses(gc):
     rows = ws.get_all_values()
     result = {}
     for row in rows[1:]:
-        if len(row) > 1 and row[1].strip():
-            doc_no = row[1].strip()
+        if len(row) > 4 and row[4].strip():
+            doc_no = row[4].strip()
             result[doc_no] = {
-                "channel":    row[2].strip() if len(row) > 2 else "",
-                "email_addr": row[3].strip() if len(row) > 3 else "",
+                "tax_id":       row[1].strip() if len(row) > 1 else "",
+                "customer_name": row[2].strip() if len(row) > 2 else "",
+                "address":      row[3].strip() if len(row) > 3 else "",
+                "channel":      row[5].strip() if len(row) > 5 else "",
+                "email_addr":   row[6].strip() if len(row) > 6 else "",
             }
     return result
 
@@ -412,13 +415,13 @@ def process(erp_bytes, form_data, sh):
                 vat   = round(sale * 0.07, 2)
                 total = round(sale + vat, 2)
                 raw_su = first[sales_user_col].strip() if (sales_user_col is not None and sales_user_col < len(first)) else ""
-                raw_tax_id = first[ERP_COLS["OrderTaxId"]].strip()
+                raw_tax_id = fd.get("tax_id") or first[ERP_COLS["OrderTaxId"]].strip()
                 values = [
                     inv_no,
                     parse_sales_user(raw_su) if raw_su else (first[branch_col].strip() if branch_col < len(first) else ""),
                     doc_no,
-                    clean_name(first[ERP_COLS["OrderName"]].strip()),
-                    first[ERP_COLS["OrderAddress"]].strip(),
+                    fd.get("customer_name") or clean_name(first[ERP_COLS["OrderName"]].strip()),
+                    fd.get("address") or first[ERP_COLS["OrderAddress"]].strip(),
                     raw_tax_id,  # will be rewritten as RAW string after all rows are saved
                     line["name"],
                     line["qty"],
