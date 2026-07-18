@@ -93,9 +93,13 @@ def abbreviate_item(text):
     yr_range = re.search(r'(?:19|20)\d{2}(?:-(?:19|20)\d{2})?', t)
     product = t[yr_range.end():].strip() if yr_range else ""
     product = re.sub(r'^[\s\(\[\-]+', '', product).strip()
-    letters = re.sub(r'[^A-Za-z]', '', model_part)
-    consonants = [c for c in letters.upper() if c not in "AEIOU"]
-    abbr = "".join(consonants[:2]) if len(consonants) >= 2 else (letters[:2].upper() if letters else "??")
+    letters = re.sub(r'[^A-Za-z]', '', model_part).upper()
+    if len(letters) >= 2:
+        first = letters[0]
+        rest_consonants = [c for c in letters[1:] if c not in "AEIOU"]
+        abbr = first + (rest_consonants[0] if rest_consonants else letters[1])
+    else:
+        abbr = (letters[:2] if letters else "??")
     if product:
         # Take only the first product-type word (Thai compound noun, no spaces)
         # If first token is non-Thai prefix (e.g. "5D", "ZX"), include next word too
