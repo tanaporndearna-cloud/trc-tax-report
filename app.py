@@ -394,9 +394,14 @@ def process(erp_bytes, form_data, sh):
             first = rows_for_doc[0]
 
             lines = []
+            has_prop = any(
+                r[ERP_COLS["PropAvailable"]].strip()
+                for r in rows_for_doc
+                if len(r) > ERP_COLS["PropAvailable"]
+            )
             for r in rows_for_doc:
-                prop = r[ERP_COLS["PropAvailable"]].strip()
-                desc = r[ERP_COLS["IcProductDescription"]].strip()
+                prop = r[ERP_COLS["PropAvailable"]].strip() if len(r) > ERP_COLS["PropAvailable"] else ""
+                desc = r[ERP_COLS["IcProductDescription"]].strip() if len(r) > ERP_COLS["IcProductDescription"] else ""
                 try:
                     price = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["PriceEach"]].strip()))
                 except Exception:
@@ -405,8 +410,14 @@ def process(erp_bytes, form_data, sh):
                     qty = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["RevenueQuantity"]].strip()))
                 except Exception:
                     qty = 0.0
-                if price > 0 and desc and desc.strip().upper() != "VAT":
-                    lines.append({"name": abbreviate_item(desc if desc else prop), "qty": int(qty), "price": price})
+                if has_prop:
+                    # โปรโมชั่น: ใช้แถวที่มี prop เท่านั้น
+                    if prop and price > 0:
+                        lines.append({"name": abbreviate_item(desc if desc else prop), "qty": int(qty), "price": price})
+                else:
+                    # ขายปกติ: ใช้ desc กรอง VAT ออก
+                    if price > 0 and desc and desc.strip().upper() != "VAT":
+                        lines.append({"name": abbreviate_item(desc), "qty": int(qty), "price": price})
             if not lines:
                 continue
 
