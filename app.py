@@ -301,14 +301,16 @@ def read_form_responses(gc):
     result = {}
     for row in rows[1:]:
         if len(row) > 4 and row[4].strip():
-            doc_no = row[4].strip()
-            result[doc_no] = {
-                "tax_id":       row[1].strip() if len(row) > 1 else "",
+            doc_nos = [d.strip() for d in row[4].strip().split("/") if d.strip()]
+            info = {
+                "tax_id":        row[1].strip() if len(row) > 1 else "",
                 "customer_name": row[2].strip() if len(row) > 2 else "",
-                "address":      row[3].strip() if len(row) > 3 else "",
-                "channel":      row[5].strip() if len(row) > 5 else "",
-                "email_addr":   row[6].strip() if len(row) > 6 else "",
+                "address":       row[3].strip() if len(row) > 3 else "",
+                "channel":       row[5].strip() if len(row) > 5 else "",
+                "email_addr":    row[6].strip() if len(row) > 6 else "",
             }
+            for doc_no in doc_nos:
+                result[doc_no] = info
     return result
 
 def process(erp_bytes, form_data, sh):
