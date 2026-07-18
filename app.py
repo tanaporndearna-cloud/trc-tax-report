@@ -333,7 +333,7 @@ def process(erp_bytes, form_data, sh):
     for row in erp_rows:
         if len(row) <= max(ERP_COLS.values()):
             continue
-        doc = row[ERP_COLS["RefDocNo"]].strip()
+        doc = re.sub(r'^="?(.*?)"?$', r'\1', row[ERP_COLS["RefDocNo"]].strip())
         if doc in form_data:
             erp_map.setdefault(doc, []).append(row)
     if not erp_map:
