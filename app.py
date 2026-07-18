@@ -398,11 +398,11 @@ def process(erp_bytes, form_data, sh):
                 prop = r[ERP_COLS["PropAvailable"]].strip()
                 desc = r[ERP_COLS["IcProductDescription"]].strip()
                 try:
-                    price = float(r[ERP_COLS["PriceEach"]])
+                    price = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["PriceEach"]].strip()))
                 except Exception:
                     price = 0.0
                 try:
-                    qty = float(r[ERP_COLS["RevenueQuantity"]])
+                    qty = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["RevenueQuantity"]].strip()))
                 except Exception:
                     qty = 0.0
                 if prop and price > 0:
