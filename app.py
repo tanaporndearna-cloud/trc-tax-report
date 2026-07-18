@@ -183,7 +183,8 @@ def cleanup_empty_slots(ws):
             continue
         inv_no = row[1].strip() if len(row) > 1 else ""
         doc_no = row[3].strip() if len(row) > 3 else ""
-        if inv_no and not doc_no and inv_no in written_inv:
+        item = row[7].strip() if len(row) > 7 else ""
+        if inv_no and not doc_no and not item and inv_no in written_inv:
             empty_rows.append(i + 1)
     for row_num in reversed(empty_rows):
         sheets_call(lambda r=row_num: ws.delete_rows(r))
