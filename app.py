@@ -418,31 +418,46 @@ def process(erp_bytes, form_data, sh):
                 total = round(sale + vat, 2)
                 raw_su = first[sales_user_col].strip() if (sales_user_col is not None and sales_user_col < len(first)) else ""
                 raw_tax_id = fd.get("tax_id") or first[ERP_COLS["OrderTaxId"]].strip()
-                values = [
-                    inv_no,
-                    parse_sales_user(raw_su) if raw_su else (first[branch_col].strip() if branch_col < len(first) else ""),
-                    doc_no,
-                    fd.get("customer_name") or clean_name(first[ERP_COLS["OrderName"]].strip()),
-                    fd.get("address") or first[ERP_COLS["OrderAddress"]].strip(),
-                    raw_tax_id,  # will be rewritten as RAW string after all rows are saved
-                    line["name"],
-                    line["qty"],
-                    line["price"],
-                    sale,
-                    vat,
-                    total,
-                    fd.get("channel", ""),
-                    fd.get("email_addr", ""),
-                ]
+                is_extra = i > 0
+                if is_extra:
+                    # แถว 2+ ใส่ B (เลขที่) + H-M เท่านั้น
+                    values = [
+                        inv_no,  # B = เลขที่
+                        "", "", "", "", "",  # C-G ว่าง
+                        line["name"],
+                        line["qty"],
+                        line["price"],
+                        sale,
+                        vat,
+                        total,
+                        "", "",  # N-O ว่าง
+                    ]
+                else:
+                    values = [
+                        inv_no,
+                        parse_sales_user(raw_su) if raw_su else (first[branch_col].strip() if branch_col < len(first) else ""),
+                        doc_no,
+                        fd.get("customer_name") or clean_name(first[ERP_COLS["OrderName"]].strip()),
+                        fd.get("address") or first[ERP_COLS["OrderAddress"]].strip(),
+                        raw_tax_id,  # will be rewritten as RAW string after all rows are saved
+                        line["name"],
+                        line["qty"],
+                        line["price"],
+                        sale,
+                        vat,
+                        total,
+                        fd.get("channel", ""),
+                        fd.get("email_addr", ""),
+                    ]
                 write_ops.append({
                     "ws":         ws,
                     "sheet_name": sname,
                     "row_idx":    row_idx,
                     "inv_no":     inv_no,
                     "values":     values,
-                    "is_insert":  i > 0,
+                    "is_insert":  is_extra,
                     "date_str":   d_str,
-                    "tax_id":     raw_tax_id,
+                    "tax_id":     raw_tax_id if not is_extra else "",
                 })
                 preview_rows.append({
                     "Sheet":      sname,
@@ -564,7 +579,7 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
                     actual_row = op["row_idx"] + offset
                 try:
                     if op["is_insert"]:
-                        row_data = [op["date_str"]] + list(op["values"])
+                        row_data = [""] + list(op["values"])  # A ว่าง (date), B-G ว่าง, H-M ใส่ข้อมูล
                         row_data[10] = f"=I{actual_row}*J{actual_row}"
                         row_data[11] = f"=K{actual_row}*0.07"
                         row_data[12] = f"=K{actual_row}+L{actual_row}"
