@@ -405,7 +405,7 @@ def process(erp_bytes, form_data, sh):
                     qty = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["RevenueQuantity"]].strip()))
                 except Exception:
                     qty = 0.0
-                if prop and price > 0:
+                if price > 0 and desc and desc.strip().upper() != "VAT":
                     lines.append({"name": abbreviate_item(desc if desc else prop), "qty": int(qty), "price": price})
             if not lines:
                 continue
