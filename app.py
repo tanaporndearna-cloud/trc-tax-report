@@ -564,9 +564,10 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
         st.info(f"ℹ️ ไม่มีข้อมูลที่ต้องเขียน — Form มี {len(form_data)} docs, ตรวจสอบว่าเลขที่เอกสารใน Form ตรงกับใน ERP CSV และยังไม่ได้บันทึกลง Sheet")
 
     if preview_rows:
+        unique_docs = len({op["inv_no"] for op in write_ops})
         insert_count = sum(1 for op in write_ops if op["is_insert"])
-        note = f" ({insert_count} inserted rows)" if insert_count else ""
-        st.success(f"Found **{len(preview_rows)} rows** to write{note}")
+        note = f" ({insert_count} แถวเพิ่ม)" if insert_count else ""
+        st.success(f"พบ **{unique_docs} เลขที่เอกสาร** ({len(preview_rows)} แถว){note}")
         st.dataframe(pd.DataFrame(preview_rows), use_container_width=True, hide_index=True)
 
         st.subheader("4.  Save to Google Sheet")
