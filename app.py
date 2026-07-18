@@ -337,6 +337,9 @@ def process(erp_bytes, form_data, sh):
         if doc in form_data:
             erp_map.setdefault(doc, []).append(row)
     if not erp_map:
+        sample_docs = list({row[ERP_COLS["RefDocNo"]].strip() for row in erp_rows[:50] if len(row) > ERP_COLS["RefDocNo"]})[:5]
+        form_sample = list(form_data.keys())[:5]
+        st.warning(f"⚠️ ไม่มี doc ที่ match — ตัวอย่างใน ERP: {sample_docs} | ตัวอย่างใน Form: {form_sample}")
         return [], [], []
 
     doc_by_month = {}
@@ -555,6 +558,10 @@ if erp_file and "form_data" in st.session_state and "gc" in st.session_state:
 
     if new_sheets:
         st.success(f"Created new sheets with 20 slots/day: {', '.join(new_sheets)}")
+
+    if not preview_rows and not new_sheets:
+        form_data = st.session_state.get("form_data", {})
+        st.info(f"ℹ️ ไม่มีข้อมูลที่ต้องเขียน — Form มี {len(form_data)} docs, ตรวจสอบว่าเลขที่เอกสารใน Form ตรงกับใน ERP CSV และยังไม่ได้บันทึกลง Sheet")
 
     if preview_rows:
         insert_count = sum(1 for op in write_ops if op["is_insert"])
