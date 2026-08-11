@@ -420,7 +420,7 @@ def process(erp_bytes, form_data, sh):
                 if price <= 0 or not desc or desc_upper == "VAT" or desc_upper.startswith("PROMOTION"):
                     continue
                 # ถ้าเพิ่มแล้วเกิน expected_sale ให้ข้ามแถวนั้น (เป็น sub-item ของชุด)
-               if expected_sale is not None and running_sum > 0 and running_sum + price > expected_sale + 0.01:
+                if price is not None and running_sum > 0 and running_sum + price > expected_sale + 0.01:
                     continue
                # หักส่วนลด (DiscountAmount) ถ้ามี
                 try:
