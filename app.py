@@ -42,6 +42,7 @@ ERP_COLS = {
     "RevenueQuantity":      col_idx("QI"),
     "PriceEach":            col_idx("CJ"),
     "PropAvailable":        col_idx("GE"),
+    "DiscountAmount":       col_idx("CR"),
 }
 
 def clean_name(n):
@@ -419,10 +420,16 @@ def process(erp_bytes, form_data, sh):
                 if price <= 0 or not desc or desc_upper == "VAT" or desc_upper.startswith("PROMOTION"):
                     continue
                 # ถ้าเพิ่มแล้วเกิน expected_sale ให้ข้ามแถวนั้น (เป็น sub-item ของชุด)
-                if expected_sale is not None and running_sum + price > expected_sale + 0.01:
+               if expected_sale is not None and running_sum > 0 and running_sum + price > expected_sale + 0.01:
                     continue
-                lines.append({"name": abbreviate_item(desc), "qty": int(qty), "price": price})
-                running_sum += price
+               # หักส่วนลด (DiscountAmount) ถ้ามี
+                try:
+                    discount = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["DiscountAmount"]].strip()))
+                except Exception:
+                    discount = 0.0
+                effective_price = round(price - discount, 2) if discount > 0 else price
+                lines.append({"name": abbreviate_item(desc), "qty": int(qty), "price": effective_price})
+                running_sum += effective_price
             if not lines:
                 continue
 
