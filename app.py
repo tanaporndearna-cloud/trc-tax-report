@@ -393,14 +393,19 @@ def process(erp_bytes, form_data, sh):
             fd = form_data[doc_no]
             first = rows_for_doc[0]
 
-            lines = []
-            has_prop = any(
-                r[ERP_COLS["PropAvailable"]].strip()
-                for r in rows_for_doc
-                if len(r) > ERP_COLS["PropAvailable"]
-            )
+           # หา VAT amount เพื่อคำนวณ expected_sale
+            vat_amount = 0.0
             for r in rows_for_doc:
-                prop = r[ERP_COLS["PropAvailable"]].strip() if len(r) > ERP_COLS["PropAvailable"] else ""
+                _d = r[ERP_COLS["IcProductDescription"]].strip() if len(r) > ERP_COLS["IcProductDescription"] else ""
+                if _d.strip().upper() == "VAT":
+                    try: vat_amount = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["PriceEach"]].strip()))
+                    except: pass
+                    break
+            expected_sale = round(vat_amount / 0.07, 2) if vat_amount > 0 else None
+
+            lines = []
+            running_sum = 0.0
+            for r in rows_for_doc:
                 desc = r[ERP_COLS["IcProductDescription"]].strip() if len(r) > ERP_COLS["IcProductDescription"] else ""
                 try:
                     price = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["PriceEach"]].strip()))
@@ -410,14 +415,14 @@ def process(erp_bytes, form_data, sh):
                     qty = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["RevenueQuantity"]].strip()))
                 except Exception:
                     qty = 0.0
-                if has_prop:
-                    # โปรโมชั่น: ใช้แถวที่มี prop เท่านั้น
-                    if price > 0 and desc and desc.strip().upper() != "VAT" and not desc.strip().upper().startswith("PROMOTION"):
-                        lines.append({"name": abbreviate_item(desc), "qty": int(qty), "price": price})
-                else:
-                    # ขายปกติ: ใช้ desc กรอง VAT ออก
-                    if price > 0 and desc and desc.strip().upper() != "VAT" and not desc.strip().upper().startswith("PROMOTION"):
-                        lines.append({"name": abbreviate_item(desc), "qty": int(qty), "price": price})
+                desc_upper = desc.strip().upper()
+                if price <= 0 or not desc or desc_upper == "VAT" or desc_upper.startswith("PROMOTION"):
+                    continue
+                # ถ้าเพิ่มแล้วเกิน expected_sale ให้ข้ามแถวนั้น (เป็น sub-item ของชุด)
+                if expected_sale is not None and running_sum + price > expected_sale + 0.01:
+                    continue
+                lines.append({"name": abbreviate_item(desc), "qty": int(qty), "price": price})
+                running_sum += price
             if not lines:
                 continue
 
