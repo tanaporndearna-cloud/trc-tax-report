@@ -412,11 +412,11 @@ def process(erp_bytes, form_data, sh):
                     qty = 0.0
                 if has_prop:
                     # โปรโมชั่น: ใช้แถวที่มี prop เท่านั้น
-                    if prop and price > 0:
-                        lines.append({"name": abbreviate_item(desc if desc else prop), "qty": int(qty), "price": price})
+                    if price > 0 and desc and desc.strip().upper() != "VAT" and not desc.strip().upper().startswith("PROMOTION"):
+                        lines.append({"name": abbreviate_item(desc), "qty": int(qty), "price": price})
                 else:
                     # ขายปกติ: ใช้ desc กรอง VAT ออก
-                    if price > 0 and desc and desc.strip().upper() != "VAT":
+                    if price > 0 and desc and desc.strip().upper() != "VAT":and not desc.strip().upper().startswith("PROMOTION"):
                         lines.append({"name": abbreviate_item(desc), "qty": int(qty), "price": price})
             if not lines:
                 continue
