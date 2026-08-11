@@ -417,7 +417,32 @@ def process(erp_bytes, form_data, sh):
                 except Exception:
                     qty = 0.0
                 desc_upper = desc.strip().upper()
-                if price <= 0 or not desc or desc_upper == "VAT" or desc_upper.startswith("PROMOTION"):
+                if price <= 0 or not desc or desc_upper == "VAT":
+                    continue
+                if desc_upper.startswith("PROMOTION"):
+                    if price > 0 and "ชุด" in desc:
+                        m_chud = re.search(r'ชุด\s*(\S+)', desc)
+                        bundle_suffix = m_chud.group(1) if m_chud else "สเกิร์ตรอบคัน"
+                        first_child_desc = next(
+                            (r2[ERP_COLS["IcProductDescription"]].strip()
+                             for r2 in rows_for_doc
+                             if len(r2) > ERP_COLS["PropAvailable"] and r2[ERP_COLS["PropAvailable"]].strip()
+                             and r2[ERP_COLS["IcProductDescription"]].strip().upper() != "VAT"),
+                            None
+                        )
+                        if first_child_desc:
+                            abbreviated = abbreviate_item(first_child_desc)
+                            model_part = abbreviated.split()[0] if abbreviated else ""
+                            bundle_name = f"{model_part} ชุด{bundle_suffix}" if model_part else f"ชุด{bundle_suffix}"
+                        else:
+                            bundle_name = f"ชุด{bundle_suffix}"
+                        try:
+                            discount = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["DiscountAmount"]].strip()))
+                        except Exception:
+                            discount = 0.0
+                        effective_price = round(price - discount, 2) if discount > 0 else price
+                        lines.append({"name": bundle_name, "qty": int(qty), "price": effective_price})
+                        running_sum += effective_price
                     continue
                 # ถ้าเพิ่มแล้วเกิน expected_sale ให้ข้ามแถวนั้น (เป็น sub-item ของชุด)
                 if price is not None and running_sum > 0 and running_sum + price > expected_sale + 0.01:
