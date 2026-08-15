@@ -98,7 +98,10 @@ def abbreviate_item(text):
     if len(letters) >= 2:
         first = letters[0]
         rest_consonants = [c for c in letters[1:] if c not in "AEIOU"]
-        abbr = first + (rest_consonants[0] if rest_consonants else letters[1])
+        if rest_consonants and rest_consonants[0] == "L" and len(rest_consonants) > 1:
+            abbr = first + rest_consonants[1]
+        else:
+            abbr = first + (rest_consonants[0] if rest_consonants else letters[1])
     else:
         abbr = (letters[:2] if letters else "??")
     if product:
