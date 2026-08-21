@@ -402,13 +402,14 @@ def process(erp_bytes, form_data, sh):
             for r in rows_for_doc:
                 _d = r[ERP_COLS["IcProductDescription"]].strip() if len(r) > ERP_COLS["IcProductDescription"] else ""
                 if _d.strip().upper() == "VAT":
-                    try: vat_amount = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["PriceEach"]].strip()))
+                    try: vat_amount += float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["PriceEach"]].strip()))
                     except: pass
-                    break
+               
             expected_sale = round(vat_amount / 0.07, 2) if vat_amount > 0 else None
 
             lines = []
             running_sum = 0.0
+            has_bundle = False
             for r in rows_for_doc:
                 desc = r[ERP_COLS["IcProductDescription"]].strip() if len(r) > ERP_COLS["IcProductDescription"] else ""
                 try:
