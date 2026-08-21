@@ -425,6 +425,7 @@ def process(erp_bytes, form_data, sh):
                     continue
                 if desc_upper.startswith("PROMOTION"):
                     if price > 0 and "ชุด" in desc:
+                        has_bundle = True
                         m_chud = re.search(r'ชุด\s*(\S+)', desc)
                         bundle_suffix = m_chud.group(1) if m_chud else "สเกิร์ตรอบคัน"
                         first_child_desc = next(
@@ -449,7 +450,7 @@ def process(erp_bytes, form_data, sh):
                         running_sum += effective_price
                     continue
                 # ถ้าเพิ่มแล้วเกิน expected_sale ให้ข้ามแถวนั้น (เป็น sub-item ของชุด)
-                if price is not None and running_sum > 0 and running_sum + price > expected_sale + 0.01:
+               if has_bundle and expected_sale is not None and running_sum > 0 and running_sum + price > expected_sale + 0.01:
                     continue
                # หักส่วนลด (DiscountAmount) ถ้ามี
                 try:
