@@ -107,7 +107,7 @@ def abbreviate_item(text):
     if product:
         # Take only the first product-type word (Thai compound noun, no spaces)
         # If first token is non-Thai prefix (e.g. "5D", "ZX"), include next word too
-                   parts = product.split(' ')
+            parts = product.split(' ')
             first = parts[0]
             if re.match(r'^[A-Za-z0-9\-]+$', first):
                 thai_word = next(
