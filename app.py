@@ -105,7 +105,6 @@ def abbreviate_item(text):
     else:
         abbr = (letters[:2] if letters else "??")
         if product:
-        # ถ้า EN นำหน้า → หาคำไทยก่อน ถ้าไม่มีค่อยเอา EN
         parts = product.split(' ')
         first = parts[0]
         if re.match(r'^[A-Za-z0-9\-]+$', first):
@@ -120,7 +119,7 @@ def abbreviate_item(text):
         else:
             product = first
         return f"{abbr}{year2} {product}"
-    return f"{abbr}{year2}"
+        return f"{abbr}{year2}"
 
 def parse_erp_date(s):
     s = s.strip()
