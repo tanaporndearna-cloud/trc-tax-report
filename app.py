@@ -107,12 +107,19 @@ def abbreviate_item(text):
     if product:
         # Take only the first product-type word (Thai compound noun, no spaces)
         # If first token is non-Thai prefix (e.g. "5D", "ZX"), include next word too
-        parts = product.split(' ')
-        first = parts[0]
-        if len(parts) > 1 and re.match(r'^[A-Za-z0-9\-]+$', first):
-            product = ' '.join(parts[:2])
-        else:
-            product = first
+                   parts = product.split(' ')
+            first = parts[0]
+            if re.match(r'^[A-Za-z0-9\-]+$', first):
+                thai_word = next(
+                    (p for p in parts[1:] if re.search(r'[\u0e00-\u0e7f]', p)),
+                    None
+                )
+                if thai_word:
+                    product = thai_word
+                else:
+                    product = ' '.join(parts[:2]) if len(parts) > 1 else first
+            else:
+                product = first
         return f"{abbr}{year2} {product}"
     return f"{abbr}{year2}"
 
