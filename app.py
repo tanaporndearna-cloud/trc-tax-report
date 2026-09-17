@@ -104,22 +104,21 @@ def abbreviate_item(text):
             abbr = first + (rest_consonants[0] if rest_consonants else letters[1])
     else:
         abbr = (letters[:2] if letters else "??")
-    if product:
-        # Take only the first product-type word (Thai compound noun, no spaces)
-        # If first token is non-Thai prefix (e.g. "5D", "ZX"), include next word too
-            parts = product.split(' ')
-            first = parts[0]
-            if re.match(r'^[A-Za-z0-9\-]+$', first):
-                thai_word = next(
-                    (p for p in parts[1:] if re.search(r'[\u0e00-\u0e7f]', p)),
-                    None
-                )
-                if thai_word:
-                    product = thai_word
-                else:
-                    product = ' '.join(parts[:2]) if len(parts) > 1 else first
+        if product:
+        # ถ้า EN นำหน้า → หาคำไทยก่อน ถ้าไม่มีค่อยเอา EN
+        parts = product.split(' ')
+        first = parts[0]
+        if re.match(r'^[A-Za-z0-9\-]+$', first):
+            thai_word = next(
+                (p for p in parts[1:] if re.search(r'[\u0e00-\u0e7f]', p)),
+                None
+            )
+            if thai_word:
+                product = thai_word
             else:
-                product = first
+                product = ' '.join(parts[:2]) if len(parts) > 1 else first
+        else:
+            product = first
         return f"{abbr}{year2} {product}"
     return f"{abbr}{year2}"
 
