@@ -105,8 +105,8 @@ def abbreviate_item(text):
     else:
         abbr = (letters[:2] if letters else "??")
         if product:
-        parts = product.split(' ')
-        first = parts[0]
+            parts = product.split(' ')
+            first = parts[0]
         if re.match(r'^[A-Za-z0-9\-]+$', first):
             thai_word = next(
                 (p for p in parts[1:] if re.search(r'[\u0e00-\u0e7f]', p)),
