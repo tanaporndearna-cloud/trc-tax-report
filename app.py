@@ -116,10 +116,10 @@ def abbreviate_item(text):
                 product = thai_word
             else:
                 product = ' '.join(parts[:2]) if len(parts) > 1 else first
-        else:
+               else:
             product = first
         return f"{abbr}{year2} {product}"
-        return f"{abbr}{year2}"
+    return f"{abbr}{year2}"
 
 def parse_erp_date(s):
     s = s.strip()
