@@ -76,19 +76,14 @@ def clean_item(text, maxlen=30):
     return text
 
 def abbreviate_item(text):
-    """CITY HATCHBACK 2020-2021 ลิ้นหน้า ทรง SPORT -> CT20 ลิ้นหน้า
-       YARIS ATIV 2017-2018 ลิ้นหน้า -> YR17 ลิ้นหน้า"""
     t = text.strip().split("\n")[0].strip()
-    # Strip trailing parenthetical content
     t = re.sub(r'\s*[\(\[][^\)\]]{0,60}[\)\]]\s*$', '', t).strip()
-    # Strip "ทรง..." and everything after
     m_trng = re.search(r'\s+ทรง', t)
     if m_trng:
         t = t[:m_trng.start()].strip()
-    # Find first 4-digit year
     ym = re.search(r'((?:19|20)\d{2})', t)
     if not ym:
-        return t[:25]  # no year — return truncated
+        return t[:25]
     year2 = ym.group(1)[-2:]
     model_part = t[:ym.start()].strip()
     yr_range = re.search(r'(?:19|20)\d{2}(?:-(?:19|20)\d{2})?', t)
@@ -104,9 +99,9 @@ def abbreviate_item(text):
             abbr = first + (rest_consonants[0] if rest_consonants else letters[1])
     else:
         abbr = (letters[:2] if letters else "??")
-        if product:
-            parts = product.split(' ')
-            first = parts[0]
+    if product:
+        parts = product.split(' ')
+        first = parts[0]
         if re.match(r'^[A-Za-z0-9\-]+$', first):
             thai_word = next(
                 (p for p in parts[1:] if re.search(r'[\u0e00-\u0e7f]', p)),
@@ -116,11 +111,10 @@ def abbreviate_item(text):
                 product = thai_word
             else:
                 product = ' '.join(parts[:2]) if len(parts) > 1 else first
-               else:
+        else:
             product = first
         return f"{abbr}{year2} {product}"
     return f"{abbr}{year2}"
-
 def parse_erp_date(s):
     s = s.strip()
     for fmt in ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M", "%m/%d/%Y"):
