@@ -101,7 +101,14 @@ def abbreviate_item(text):
         t = t[:m_trng.start()].strip()
     ym = re.search(r'((?:19|20)\d{2})', t)
     if not ym:
-        if not any(kw in t for kw in PRODUCT_KEYWORDS):
+        parts_t = t.split()
+        first_t = parts_t[0] if parts_t else ""
+        if re.match(r'^[A-Za-z0-9\-]+$', first_t):
+            thai_t = next((p for p in parts_t[1:] if re.search(r'[฀-๿]', p)), None)
+            check_word = thai_t if thai_t else first_t
+        else:
+            check_word = first_t
+        if not any(kw in check_word for kw in PRODUCT_KEYWORDS):
             return "อุปกรณ์รถยนต์"
         return t[:25]
     year2 = ym.group(1)[-2:]
