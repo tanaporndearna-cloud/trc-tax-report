@@ -459,20 +459,7 @@ def process(erp_bytes, form_data, sh):
 
             lines = []
             running_sum = 0.0
-            # Pre-scan: ตรวจว่ามีชุดสินค้า (ชุด + PropAvailable ว่าง + ราคา > 0) ไหม
             has_bundle = False
-            for r in rows_for_doc:
-                if len(r) <= max(ERP_COLS["IcProductDescription"], ERP_COLS["PropAvailable"], ERP_COLS["PriceEach"]):
-                    continue
-                _d = r[ERP_COLS["IcProductDescription"]].strip()
-                _prop = r[ERP_COLS["PropAvailable"]].strip()
-                try:
-                    _p = float(re.sub(r'^="?(.*?)"?$', r'\1', r[ERP_COLS["PriceEach"]].strip()))
-                except Exception:
-                    _p = 0.0
-                if "ชุด" in _d and not _prop and _p > 0:
-                    has_bundle = True
-                    break
             for r in rows_for_doc:
                 desc = r[ERP_COLS["IcProductDescription"]].strip() if len(r) > ERP_COLS["IcProductDescription"] else ""
                 try:
@@ -512,10 +499,7 @@ def process(erp_bytes, form_data, sh):
                         lines.append({"name": bundle_name, "qty": int(qty), "price": effective_price})
                         running_sum += effective_price
                     continue
-                # ข้าม sub-item ของชุด (PropAvailable ไม่ว่าง = เป็น component ของชุด)
-                if has_bundle and len(r) > ERP_COLS["PropAvailable"] and r[ERP_COLS["PropAvailable"]].strip():
-                    continue
-                # ถ้าเพิ่มแล้วเกิน expected_sale ให้ข้ามแถวนั้น (fallback)
+                # ถ้าเพิ่มแล้วเกิน expected_sale ให้ข้ามแถวนั้น (เป็น sub-item ของชุด)
                 if has_bundle and expected_sale is not None and running_sum > 0 and running_sum + price > expected_sale + 0.01:
                     continue
                 # หักส่วนลด (DiscountAmount) ถ้ามี
