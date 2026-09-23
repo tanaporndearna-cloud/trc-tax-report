@@ -335,19 +335,41 @@ def read_form_responses(gc):
     sh = gc.open_by_key(FORM_SHEET_ID)
     ws = sh.get_worksheet(0)
     rows = ws.get_all_values()
+    if not rows:
+        return {}
+    header = rows[0]
+
+    def find_col(keywords):
+        for i, h in enumerate(header):
+            if any(kw in h for kw in keywords):
+                return i
+        return None
+
+    col_tax_id  = find_col(["เลขประจำตัว", "tax"])
+    col_name    = find_col(["ชื่อ-นาม", "customer", "ชื่อบริษัท", "ชื่อ-"])
+    col_address = find_col(["ที่อยู่ผู้เสียภาษี"])
+    col_doc     = find_col(["เลขที่เอกสาร"])
+    col_channel = find_col(["ช่องทาง"])
+    col_email   = find_col(["อีเมล", "email"])
+
+    def get(row, idx):
+        return row[idx].strip() if idx is not None and len(row) > idx else ""
+
     result = {}
     for row in rows[1:]:
-        if len(row) > 4 and row[4].strip():
-            doc_nos = [d.strip() for d in row[4].strip().split("/") if d.strip()]
-            info = {
-                "tax_id":        row[1].strip() if len(row) > 1 else "",
-                "customer_name": row[2].strip() if len(row) > 2 else "",
-                "address":       row[3].strip() if len(row) > 3 else "",
-                "channel":       row[5].strip() if len(row) > 5 else "",
-                "email_addr":    row[7].strip() if len(row) > 7 else "",
-            }
-            for doc_no in doc_nos:
-                result[doc_no] = info
+        doc_val = get(row, col_doc) if col_doc is not None else (row[4].strip() if len(row) > 4 else "")
+        if not doc_val:
+            continue
+        doc_nos = [d.strip() for d in doc_val.split("/") if d.strip()]
+        info = {
+            "tax_id":        get(row, col_tax_id),
+            "customer_name": get(row, col_name),
+            "address":       get(row, col_address),
+            "channel":       get(row, col_channel),
+            "email_addr":    get(row, col_email),
+        }
+        for doc_no in doc_nos:
+            result[doc_no] = info
     return result
 
 def process(erp_bytes, form_data, sh):
