@@ -344,7 +344,7 @@ def read_form_responses(gc):
                 "customer_name": row[2].strip() if len(row) > 2 else "",
                 "address":       row[3].strip() if len(row) > 3 else "",
                 "channel":       row[5].strip() if len(row) > 5 else "",
-                "email_addr":    row[6].strip() if len(row) > 6 else "",
+                "email_addr":    row[7].strip() if len(row) > 7 else "",
             }
             for doc_no in doc_nos:
                 result[doc_no] = info
